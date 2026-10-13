@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug uniquement : accès réseau et HTTP non chiffré, pour parler au
+         serveur local (http://<IP-du-PC>:8000) pendant les tests. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <application android:usesCleartextTraffic="true"/>
+</manifest>

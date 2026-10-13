@@ -1,0 +1,50 @@
+# Amusnaw — version locale pour tester l'app sur ton téléphone (même Wi-Fi que le PC)
+#
+#   cd server
+#   docker compose -f docker-compose.local.yml up -d --build
+#   docker compose -f docker-compose.local.yml exec ollama ollama pull qwen2.5:3b
+#
+# API : http://<IP-du-PC>:8000   ·   Relecture : http://localhost:8000/review (code : kabyle)
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: amusnaw
+      POSTGRES_USER: amusnaw
+      POSTGRES_PASSWORD: local
+    volumes:
+      - pgdata_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amusnaw"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://amusnaw:local@db:5432/amusnaw
+      JWT_SECRET: local-dev-secret
+      DEV_LOGIN: "true"        # connexion de test sans Google/Apple
+      REVIEW_TOKEN: kabyle     # code de la page /review
+      LLM_BASE_URL: http://ollama:11434/v1
+      LLM_API_KEY: ollama
+      LLM_MODEL: qwen2.5:3b    # rapide sur un PC sans GPU ; qwen2.5:7b = meilleur mais plus lent
+    volumes:
+      - ./prompts:/app/prompts:ro
+      - ../data:/app/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_local:/root/.ollama
+
+volumes:
+  pgdata_local:
+  ollama_local:

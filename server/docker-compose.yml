@@ -1,0 +1,58 @@
+# Amusnaw — stack VPS
+#   cp .env.example .env   (puis remplir)
+#   docker compose up -d --build
+#   docker compose --profile llm up -d     # + modèle open source local (Ollama)
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: amusnaw
+      POSTGRES_USER: amusnaw
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amusnaw"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://amusnaw:${POSTGRES_PASSWORD}@db:5432/amusnaw
+    volumes:
+      - ./prompts:/app/prompts:ro
+      - ../data:/app/data:ro   # base kabyle (lexique, paires) — à copier sur le VPS
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Modèle open source auto-hébergé (gratuit, mais lent sans GPU).
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+
+  # HTTPS automatique (Let's Encrypt) devant l'API.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  ollama:
+  caddy_data:

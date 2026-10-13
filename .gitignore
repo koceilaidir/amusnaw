@@ -1,0 +1,12 @@
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.idea/
+*.iml
+.env
+
+# Données issues de livres protégés : ne pas publier
+data/*
+!data/README.md

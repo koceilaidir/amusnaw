@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amusnaw · Relecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&family=Noto+Serif&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F2F2F7; --surface: #FFFFFF; --text: #000; --text2: #6C6C70; --sep: #D1D1D6;
+    --accent: #2F54C8; --green: #1F7A35; --greenSoft: #E2F3E6; --red: #B3261E; --redSoft: #FBE9E7;
+    --gold: #7A5A12; --goldSoft: #F6EEDB;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000; --surface: #1C1C1E; --text: #fff; --text2: #AEAEB2; --sep: #38383A;
+      --accent: #7D97F5; --green: #30D158; --greenSoft: #0E2A17; --red: #FF6B60; --redSoft: #3A1512;
+      --gold: #E6C27A; --goldSoft: #2A2416;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: -apple-system, BlinkMacSystemFont, "Noto Sans", sans-serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 30px; margin: 8px 0 4px; }
+  .sub { color: var(--text2); margin: 0 0 20px; }
+  .card { background: var(--surface); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input, textarea, select { font: inherit; color: var(--text); background: var(--bg);
+         border: 1px solid var(--sep); border-radius: 10px; padding: 10px 12px; }
+  textarea { width: 100%; resize: vertical; min-height: 48px; }
+  textarea.kab { font-family: "Noto Serif", serif; font-size: 17px; }
+  button { font: inherit; font-weight: 600; border: none; border-radius: 10px; padding: 10px 14px;
+           cursor: pointer; min-height: 44px; }
+  .ok { background: var(--greenSoft); color: var(--green); }
+  .fix { background: var(--accent); color: #fff; }
+  .rej { background: var(--redSoft); color: var(--red); }
+  .ghost { background: transparent; color: var(--accent); }
+  .tag { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
+  .doubt { background: var(--goldSoft); color: var(--gold); }
+  .src { font-size: 12px; color: var(--text2); }
+  label { font-size: 12px; font-weight: 600; color: var(--text2); display: block; margin: 10px 0 4px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .stat b { font-size: 22px; display: block; }
+  .stat span { font-size: 12px; color: var(--text2); }
+  .seg { display: inline-flex; background: var(--sep); border-radius: 10px; padding: 2px; }
+  .seg button { background: transparent; color: var(--text); min-height: 36px; padding: 6px 14px; font-weight: 500; }
+  .seg button.on { background: var(--surface); font-weight: 600; }
+  .hint { font-size: 13px; color: var(--text2); }
+  .done { opacity: .45; }
+  #login { max-width: 420px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Relecture</h1>
+  <p class="sub">Base kabyle d'Amusnaw — validez, corrigez ou rejetez chaque entrée. Les entrées validées servent au prof tout de suite, puis à l'entraînement.</p>
+
+  <div id="login" class="card" hidden>
+    <label for="tok">Code de relecture</label>
+    <div class="row">
+      <input id="tok" type="password" autocomplete="current-password" style="flex:1">
+      <button class="fix" onclick="saveToken()">Entrer</button>
+    </div>
+    <label for="who">Votre nom (facultatif)</label>
+    <input id="who" style="width:100%">
+  </div>
+
+  <div id="app" hidden>
+    <div class="card stats" id="stats"></div>
+
+    <div class="row" style="margin: 16px 0">
+      <div class="seg" role="tablist">
+        <button id="t-pair" class="on" onclick="setKind('pair')">Phrases</button>
+        <button id="t-word" onclick="setKind('word')">Mots</button>
+      </div>
+      <label for="status" style="margin:0 0 0 8px">Statut</label>
+      <select id="status" onchange="load()">
+        <option value="pending">À relire</option>
+        <option value="ok">Validées</option>
+        <option value="fixed">Corrigées</option>
+        <option value="rejected">Rejetées</option>
+      </select>
+      <input id="q" placeholder="Rechercher…" oninput="debounce()" style="flex:1; min-width: 160px">
+    </div>
+    <p class="hint">Les entrées douteuses (alignement incertain) apparaissent en premier. Raccourcis sur la carte active : <b>V</b> valider · <b>R</b> rejeter.</p>
+    <div id="list"></div>
+    <button class="ghost" onclick="load()">Charger la suite</button>
+  </div>
+</div>
+
+<script>
+  let token = "", reviewer = "", kind = "pair", timer = null, active = null;
+  try { token = localStorage.getItem("review_token") || ""; reviewer = localStorage.getItem("reviewer") || ""; } catch (e) {}
+
+  function saveToken() {
+    token = document.getElementById("tok").value.trim();
+    reviewer = document.getElementById("who").value.trim();
+    try { localStorage.setItem("review_token", token); localStorage.setItem("reviewer", reviewer); } catch (e) {}
+    start();
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", "X-Review-Token": token } });
+    if (res.status === 401) { showLogin(); throw new Error("401"); }
+    return res.json();
+  }
+
+  function showLogin() {
+    document.getElementById("login").hidden = false;
+    document.getElementById("app").hidden = true;
+  }
+
+  async function start() {
+    if (!token) return showLogin();
+    try { await stats(); } catch (e) { return; }
+    document.getElementById("login").hidden = true;
+    document.getElementById("app").hidden = false;
+    load();
+  }
+
+  async function stats() {
+    const s = await api("/review/stats");
+    const p = s.pair || {}, w = s.word || {};
+    document.getElementById("stats").innerHTML = [
+      ["Phrases à relire", p.pending || 0], ["dont douteuses", p.doubtful || 0],
+      ["Phrases validées", (p.ok || 0) + (p.fixed || 0)], ["Mots validés", (w.ok || 0) + (w.fixed || 0)],
+      ["Rejetées", (p.rejected || 0) + (w.rejected || 0)],
+    ].map(([l, v]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
+  }
+
+  function setKind(k) {
+    kind = k;
+    document.getElementById("t-pair").classList.toggle("on", k === "pair");
+    document.getElementById("t-word").classList.toggle("on", k === "word");
+    load();
+  }
+
+  function debounce() { clearTimeout(timer); timer = setTimeout(load, 300); }
+
+  function esc(s) { return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  async function load() {
+    const status = document.getElementById("status").value;
+    const q = encodeURIComponent(document.getElementById("q").value);
+    const items = await api(`/review/items?kind=${kind}&status=${status}&q=${q}&limit=30`);
+    const list = document.getElementById("list");
+    list.innerHTML = items.length ? "" : `<div class="card hint">Rien ici. Tanemmirt !</div>`;
+    for (const it of items) {
+      const el = document.createElement("div");
+      el.className = "card";
+      el.tabIndex = 0;
+      el.innerHTML = `
+        <div class="row" style="justify-content:space-between">
+          <span class="src">${esc(it.source)}</span>
+          ${it.confident ? "" : '<span class="tag doubt">Alignement douteux</span>'}
+        </div>
+        <label for="k-${it.id}">Kabyle</label>
+        <textarea class="kab" id="k-${it.id}">${esc(it.kab)}</textarea>
+        <label for="f-${it.id}">Français</label>
+        <textarea id="f-${it.id}">${esc(it.fr)}</textarea>
+        <div class="row" style="margin-top:12px">
+          <button class="ok">Juste</button>
+          <button class="fix">Enregistrer la correction</button>
+          <button class="rej">Rejeter</button>
+        </div>`;
+      const [okB, fixB, rejB] = el.querySelectorAll("button");
+      okB.onclick = () => decide(it, el, "ok");
+      fixB.onclick = () => decide(it, el, "fixed");
+      rejB.onclick = () => decide(it, el, "rejected");
+      el.addEventListener("focusin", () => active = { it, el });
+      list.appendChild(el);
+    }
+  }
+
+  async function decide(it, el, status) {
+    const kab = document.getElementById("k-" + it.id).value.trim();
+    const fr = document.getElementById("f-" + it.id).value.trim();
+    await api(`/review/items/${it.id}`, { method: "POST", body: JSON.stringify({ status, kab, fr, reviewer }) });
+    el.classList.add("done");
+    el.querySelectorAll("button, textarea").forEach(x => x.disabled = true);
+    stats();
+    const next = el.nextElementSibling;
+    if (next) next.focus();
+  }
+
+  document.addEventListener("keydown", e => {
+    if (!active || e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+    if (e.key === "v" || e.key === "V") decide(active.it, active.el, "ok");
+    if (e.key === "r" || e.key === "R") decide(active.it, active.el, "rejected");
+  });
+
+  start();
+</script>
+</body>
+</html>
