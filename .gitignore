@@ -10,3 +10,6 @@ build/
 # Données issues de livres protégés : ne pas publier
 data/*
 !data/README.md
+!data/songs/
+data/songs/*
+!data/songs/README.md

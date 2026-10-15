@@ -6,14 +6,49 @@ import '../../core/learning/learner_store.dart';
 import '../../core/locale/locale_controller.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/filigree.dart';
+import '../../content/sample_content.dart';
 import '../../widgets/common.dart';
+import '../../widgets/content_cards.dart';
 
 class _Msg {
-  _Msg(this.text, {required this.fromTutor, this.offTopic = false, this.failed = false});
-  final String text;
+  _Msg(this.text,
+      {required this.fromTutor,
+      this.offTopic = false,
+      this.failed = false,
+      this.celebration = false,
+      this.block});
+
+  /// Élément interactif construit par le serveur à partir de la base vérifiée
+  /// (type : word, exercise, capsule). Les types inconnus sont ignorés, ce qui
+  /// permet d'en ajouter côté serveur sans casser cette version de l'app.
+  final Map<String, dynamic>? block;
+
+  /// Modifiable : la réponse du prof s'écrit au fur et à mesure (streaming).
+  String text;
   final bool fromTutor;
-  final bool offTopic;
-  final bool failed;
+  bool offTopic;
+  bool failed;
+
+  /// Message de félicitations (nouveaux mots appris), affiché par l'app.
+  final bool celebration;
+}
+
+/// « Félicitations… le nombre total est de : N », dans la langue de l'élève.
+String learnedMessage(String lang, List<String> words, int total) {
+  final w = words.map((e) => '« $e »').join(', ');
+  final en = words.map((e) => '“$e”').join(', ');
+  switch (lang) {
+    case 'fr':
+      return 'Félicitations ! Tu as réutilisé $w. Ton nombre de mots appris a augmenté : le total est de $total.';
+    case 'ar':
+      return 'تهانينا! استعملت من جديد $en. ازداد عدد الكلمات التي تعلّمتها: المجموع $total.';
+    case 'es':
+      return '¡Enhorabuena! Has vuelto a usar $en. Tu número de palabras aprendidas ha aumentado: el total es $total.';
+    case 'de':
+      return 'Glückwunsch! Du hast $en wieder benutzt. Deine Zahl gelernter Wörter ist gestiegen: insgesamt $total.';
+    default:
+      return 'Congratulations! You used $en again. Your number of learned words went up: the total is $total.';
+  }
 }
 
 /// Écran 2 : conversation avec le prof.
@@ -78,25 +113,80 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       _sending = true;
     });
     _scrollToEnd();
+    // La réponse du prof s'affiche mot par mot pendant qu'elle est générée.
+    final reply = _Msg('', fromTutor: true);
+    var started = false;
     try {
-      final res = await api.post('/tutor/chat', {'message': text});
-      learnerStore.recordChat();
-      _messages.add(_Msg(res['reply'] as String,
-          fromTutor: true, offTopic: res['off_topic'] == true));
+      await for (final ev in api.stream('/tutor/chat/stream', {
+        'message': text,
+        'tz_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
+      })) {
+        if (!mounted) return;
+        switch (ev['type']) {
+          case 'delta':
+            setState(() {
+              if (!started) {
+                _messages.add(reply);
+                started = true;
+              }
+              reply.text += ev['text'] as String;
+            });
+            _scrollToEnd(animate: false);
+          case 'done':
+            learnerStore.recordChat();
+            final learned = (ev['learned'] as Map?) ?? const {};
+            final newWords = ((learned['new'] as List?) ?? const []).cast<String>();
+            final total = (learned['total'] as num?)?.toInt();
+            if (total != null) learnerStore.setLearnedTotal(total);
+            setState(() {
+              if (!started) {
+                _messages.add(reply);
+                started = true;
+              }
+              reply.text = ev['reply'] as String;
+              reply.offTopic = ev['off_topic'] == true;
+              if (newWords.isNotEmpty && total != null) {
+                // Les félicitations s'affichent juste avant la réponse du prof.
+                _messages.insert(_messages.indexOf(reply),
+                    _Msg(learnedMessage(localeController.value.code, newWords, total),
+                        fromTutor: true, celebration: true));
+              }
+              for (final b in (ev['blocks'] as List?) ?? const []) {
+                if (b is Map<String, dynamic> && _BlockView.supports(b)) {
+                  _messages.add(_Msg('', fromTutor: true, block: b));
+                }
+              }
+            });
+          case 'error':
+            throw ApiException(503, ev['message'] as String? ?? '');
+        }
+      }
     } catch (_) {
-      _messages.add(_Msg('I couldn’t reach your tutor. Check your connection and try again.',
-          fromTutor: true, failed: true));
+      if (!mounted) return;
+      setState(() {
+        if (started && reply.text.isNotEmpty) {
+          reply.failed = true; // réponse coupée : on garde ce qui est arrivé
+        } else {
+          _messages.remove(reply);
+          _messages.add(_Msg('I couldn’t reach your tutor. Check your connection and try again.',
+              fromTutor: true, failed: true));
+        }
+      });
     } finally {
       if (mounted) setState(() => _sending = false);
       _scrollToEnd();
     }
   }
 
-  void _scrollToEnd() {
+  void _scrollToEnd({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
-      _scroll.animateTo(_scroll.position.maxScrollExtent + 80,
-          duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      final target = _scroll.position.maxScrollExtent + 80;
+      if (animate) {
+        _scroll.animateTo(target, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      } else {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      }
     });
   }
 
@@ -150,7 +240,8 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                             ],
                           ),
                         ),
-                      if (_sending) const _Typing(),
+                      // « Amusnaw is writing… » jusqu'au premier mot de la réponse
+                      if (_sending && !_messages.last.fromTutor) const _Typing(),
                     ],
                   ),
                 ),
@@ -171,6 +262,8 @@ class _Bubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    if (m.celebration) return _Celebration(m.text);
+    if (m.block != null) return _BlockView(m.block!);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = m.fromTutor ? (isDark ? const Color(0xFF26252A) : const Color(0xFFE9E9EB)) : p.accent;
     final fg = m.fromTutor ? p.text : p.onAccent;
@@ -194,6 +287,87 @@ class _Bubble extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: p.text2)),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Carte mot / exercice / capsule sous la réponse du prof.
+class _BlockView extends StatelessWidget {
+  const _BlockView(this.b);
+  final Map<String, dynamic> b;
+
+  static bool supports(Map<String, dynamic> b) =>
+      const {'word', 'exercise', 'capsule'}.contains(b['type']);
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1C1C1E) : p.bg;
+    final Widget child;
+    try {
+      child = switch (b['type']) {
+        'word' => WordCard(word: WordOfTheDay.fromJson(b), caption: 'New word', compact: true, color: cardBg),
+        'exercise' => InlineExercise(
+            exercise: ChoiceExercise.fromJson(b),
+            color: cardBg,
+            onCorrect: () {
+              final ex = ChoiceExercise.fromJson(b);
+              final word = ex.hasBlank ? ex.answer : ex.before;
+              api.post('/learning/seen', {
+                'words': [word],
+              }).catchError((_) => <String, dynamic>{});
+              learnerStore.recordAnswer(
+                id: ex.id,
+                kabyle: word,
+                translation: ex.hasBlank ? (ex.translation ?? '') : ex.answer,
+                correct: true,
+              );
+            },
+          ),
+        'capsule' => CapsuleCard(capsule: CultureCapsule.fromJson(b), showBody: true),
+        _ => const SizedBox.shrink(),
+      };
+    } catch (_) {
+      return const SizedBox.shrink(); // bloc mal formé : on n'affiche rien
+    }
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .82),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Carte de félicitations, centrée, couleur « réussite ».
+class _Celebration extends StatelessWidget {
+  const _Celebration(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(color: p.greenSoft, borderRadius: BorderRadius.circular(16)),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(CupertinoIcons.star_circle_fill, color: p.green, size: 24),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(text,
+                  style: TextStyle(fontSize: 15, height: 1.4, color: p.text, fontWeight: FontWeight.w500)),
+            ),
+          ],
+        ),
       ),
     );
   }

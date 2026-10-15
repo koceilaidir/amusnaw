@@ -9,10 +9,24 @@ Dans un terminal, dossier `amusnaw\server` :
 
 ```bash
 docker compose -f docker-compose.local.yml up -d --build
-docker compose -f docker-compose.local.yml exec ollama ollama pull qwen2.5:3b
+docker compose -f docker-compose.local.yml exec ollama ollama pull modelscope.cn/Qwen/Qwen2.5-3B-Instruct-GGUF:Q4_K_M
 ```
 
-Le second ordre télécharge le modèle (~2 Go, une seule fois).
+Le second ordre télécharge le modèle (~2 Go, une seule fois) depuis **ModelScope**, le miroir chinois :
+le registre officiel d'Ollama passe par Cloudflare, inaccessible depuis la Chine.
+Hors de Chine : `ollama pull qwen2.5:3b`, puis lance le serveur avec `$env:LLM_MODEL="qwen2.5:3b"` avant `docker compose … up -d`.
+
+### Depuis la Chine : Flutter
+
+`flutter pub get` échoue (« TLS error … pub.dev ») car pub.dev est bloqué. Utilise le miroir officiel chinois, dans PowerShell :
+
+```powershell
+$env:PUB_HOSTED_URL="https://pub.flutter-io.cn"
+$env:FLUTTER_STORAGE_BASE_URL="https://storage.flutter-io.cn"
+flutter pub get
+```
+
+Pour ne plus avoir à le refaire : Paramètres Windows → « Modifier les variables d'environnement » → ajoute ces deux variables à ton compte.
 Vérifie : http://localhost:8000/health doit afficher `"knowledge_items": 3711` environ.
 
 ## 2. Trouver l'adresse IP du PC
@@ -27,7 +41,7 @@ Si le téléphone n'arrive pas à joindre le PC : autorise le port 8000 dans le 
 
 ## 3. Lancer l'app
 
-Dans `amusnaw` (la première fois seulement : `flutter create .` puis `flutter pub get`) :
+Dans `amusnaw` (la première fois seulement : `flutter create .`, `flutter pub get`, `dart run tool/patch_android.dart`, `dart run flutter_launcher_icons` ; après chaque mise à jour du code : `flutter pub get` et `dart run tool/patch_android.dart`) :
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://192.168.1.23:8000

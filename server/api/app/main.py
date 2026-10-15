@@ -5,7 +5,7 @@ from datetime import timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,8 +13,10 @@ from sqlalchemy.orm import Session
 from . import tutor
 from .auth import current_user, issue_token, upsert_user, verify_apple, verify_google
 from .config import get_settings
-from .db import ChatMessage, LearnerProfile, Review, SessionLocal, User, get_db, init_db, now
+from .db import (ChatMessage, LearnedWord, LearnerProfile, Review, SessionLocal, User, get_db,
+                 init_db, now)
 from .knowledge import kb
+from . import content, learning
 
 
 @asynccontextmanager
@@ -89,6 +91,13 @@ def login_dev(body: DevLogin, db: Session = Depends(get_db)):
     return _session(user)
 
 
+@app.post("/auth/refresh")
+def refresh(user: User = Depends(current_user)):
+    """Renouvelle le jeton à chaque ouverture : l'élève reste connecté tant
+    qu'il revient au moins une fois tous les `jwt_days` jours."""
+    return _session(user)
+
+
 @app.get("/me")
 def me(user: User = Depends(current_user)):
     return _session(user)["user"]
@@ -111,45 +120,177 @@ def set_language(body: LanguageUpdate, user: User = Depends(current_user),
 
 class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
+    # Décalage horaire de l'élève en minutes (ex. +60 à Tizi-Ouzou) : sert à
+    # savoir si un mot a été découvert « un autre jour ».
+    tz_offset_minutes: int = Field(0, ge=-840, le=840)
 
 
-@app.post("/tutor/chat")
-async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def _prepare_turn(body: "ChatIn", user: User, db: Session):
+    """Ce qui précède l'appel au modèle : mots réemployés, filtre, prompt."""
     profile = db.get(LearnerProfile, user.id) or LearnerProfile(user_id=user.id)
-
+    tz = body.tz_offset_minutes
+    # 1. L'élève a-t-il réemployé des mots découverts un jour précédent ?
+    newly_learned = learning.check_reused(db, user.id, body.message, tz)
     if tutor.is_obviously_off_topic(body.message):
-        reply, off_topic, model = tutor.off_topic_reply(user.interface_language), True, None
-    else:
-        recent = db.scalars(
-            select(ChatMessage).where(ChatMessage.user_id == user.id)
-            .order_by(ChatMessage.created_at.desc()).limit(12)
-        ).all()
-        history = [{"role": m.role, "content": m.content} for m in reversed(recent)]
-        last = profile.last_session_at
-        if last is not None and last.tzinfo is None:
-            last = last.replace(tzinfo=timezone.utc)
-        days_away = (now() - last).days if last else 0
-        # Le message + la dernière réponse du prof servent à chercher dans la base
-        context = body.message + " " + (history[-1]["content"] if history else "")
-        system = tutor.build_system_prompt(
-            user, profile, days_away=days_away,
-            session_plan="Getting to know the learner: level, goals, background.",
-            references=kb.references_for(context),
-        )
-        try:
-            reply = await tutor.ask_model(system, history, body.message)
-        except Exception as e:  # modèle indisponible
-            raise HTTPException(503, "Tutor is unavailable, try again shortly.") from e
-        off_topic, model = False, get_settings().llm_model
+        return profile, newly_learned, None, None
+    recent = db.scalars(
+        select(ChatMessage).where(ChatMessage.user_id == user.id)
+        .order_by(ChatMessage.created_at.desc()).limit(12)
+    ).all()
+    history = [{"role": m.role, "content": m.content} for m in reversed(recent)]
+    last = profile.last_session_at
+    if last is not None and last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    days_away = (now() - last).days if last else 0
+    # Le message + la dernière réponse du prof servent à chercher dans la base
+    context = body.message + " " + (history[-1]["content"] if history else "")
+    system = tutor.build_system_prompt(
+        user, profile, days_away=days_away,
+        session_plan="Getting to know the learner: level, goals, background.",
+        references=kb.references_for(context),
+        words_to_reuse=learning.words_to_reuse(db, user.id, tz),
+    )
+    return profile, newly_learned, system, history
 
+
+def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
+                 off_topic: bool, newly_learned: list[str]) -> dict:
+    """Ce qui suit la réponse : blocs, mots découverts, historique, total."""
+    model = None if off_topic else get_settings().llm_model
+    reply, markers = content.strip_markers(reply)
+    blocks = content.build_blocks(reply, markers, seed=f"{user.id}{len(reply)}") if not off_topic else []
+    if not off_topic:
+        # 2. Les mots kabyles employés par le prof sont « découverts » aujourd'hui.
+        learning.introduce(db, user.id, kb.kabyle_words(reply), "tutor")
     db.add_all([
-        ChatMessage(user_id=user.id, role="user", content=body.message, off_topic=off_topic),
+        ChatMessage(user_id=user.id, role="user", content=message, off_topic=off_topic),
         ChatMessage(user_id=user.id, role="assistant", content=reply, off_topic=off_topic, model=model),
     ])
     profile.last_session_at = now()
     db.merge(profile)
     db.commit()
-    return {"reply": reply, "off_topic": off_topic}
+    return {
+        "reply": reply,
+        "off_topic": off_topic,
+        "learned": {"new": newly_learned, "total": learning.total_learned(db, user.id)},
+        "blocks": blocks,
+    }
+
+
+@app.post("/tutor/chat")
+async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    profile, newly, system, history = _prepare_turn(body, user, db)
+    if system is None:
+        reply = tutor.off_topic_reply(user.interface_language)
+        return _finish_turn(db, user, profile, body.message, reply, True, newly)
+    try:
+        reply = await tutor.ask_model(system, history, body.message)
+    except Exception as e:  # modèle indisponible
+        raise HTTPException(503, "Tutor is unavailable, try again shortly.") from e
+    return _finish_turn(db, user, profile, body.message, reply, False, newly)
+
+
+@app.post("/tutor/chat/stream")
+async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Même chose que /tutor/chat, mais la réponse arrive mot par mot (SSE) :
+      data: {"type": "delta", "text": "…"}      (plusieurs fois)
+      data: {"type": "done", "reply": …, "off_topic": …, "learned": {…}}
+      data: {"type": "error", "message": …}
+    """
+    profile, newly, system, history = _prepare_turn(body, user, db)
+
+    def event(obj: dict) -> str:
+        return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
+
+    async def gen():
+        if system is None:
+            reply = tutor.off_topic_reply(user.interface_language)
+            yield event({"type": "delta", "text": reply})
+            yield event({"type": "done", **_finish_turn(db, user, profile, body.message, reply, True, newly)})
+            return
+        parts: list[str] = []
+        sent = 0  # caractères déjà envoyés ; on n'envoie jamais une balise [[…]]
+        try:
+            async for piece in tutor.stream_model(system, history, body.message):
+                parts.append(piece)
+                full = "".join(parts)
+                cut = full.find("[[")
+                safe = full if cut < 0 else full[:cut]
+                if full.endswith("["):  # peut-être le début d'une balise
+                    safe = safe[:-1] if cut < 0 else safe
+                if len(safe) > sent:
+                    yield event({"type": "delta", "text": safe[sent:]})
+                    sent = len(safe)
+        except Exception:
+            yield event({"type": "error", "message": "Tutor is unavailable, try again shortly."})
+            return
+        reply = "".join(parts).strip()
+        yield event({"type": "done", **_finish_turn(db, user, profile, body.message, reply, False, newly)})
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.delete("/me")
+def delete_me(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Suppression du compte et de toutes ses données (exigé par Google et Apple)."""
+    for model in (LearnedWord, ChatMessage, LearnerProfile):
+        db.query(model).filter(model.user_id == user.id).delete()
+    db.delete(db.get(User, user.id))
+    db.commit()
+    return {"deleted": True}
+
+
+# ---------- Contenus (leçons, mot du jour, capsules) ----------
+
+@app.get("/content/today")
+def content_today(tz_offset_minutes: int = Query(0, ge=-840, le=840)):
+    return content.today(learning.local_day(now(), tz_offset_minutes))
+
+
+@app.get("/content/lessons")
+def content_lessons():
+    return content.lesson_summaries()
+
+
+@app.get("/content/lessons/{lesson_id}")
+def content_lesson(lesson_id: str):
+    l = content.lesson(lesson_id)
+    if not l:
+        raise HTTPException(404)
+    return l
+
+
+@app.get("/content/capsules")
+def content_capsules():
+    return content.capsules()
+
+
+@app.get("/privacy")
+def privacy_page():
+    return FileResponse(Path(__file__).parent / "static" / "privacy.html")
+
+
+@app.get("/me/progress")
+def my_progress(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {"words_learned": learning.total_learned(db, user.id)}
+
+
+class SeenIn(BaseModel):
+    words: list[str] = Field(max_length=50)
+
+
+@app.post("/learning/seen")
+def words_seen(body: SeenIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Mots travaillés dans un exercice : découverts aujourd'hui, ils compteront
+    comme appris quand l'élève les réemploiera dans une autre conversation."""
+    words = {}
+    for w in body.words:
+        words.update(learning.tokens_of(w))
+    learning.introduce(db, user.id, words, "exercise")
+    db.commit()
+    return {"ok": True}
+
 
 
 # ---------- Relecture par le linguiste ----------

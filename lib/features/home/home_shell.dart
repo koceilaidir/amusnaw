@@ -1,6 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_client.dart';
+import '../../core/auth/auth_service.dart';
+import '../../core/auth/session.dart';
+import '../../core/learning/learner_store.dart';
 import '../../theme/app_theme.dart';
 import '../learn/learn_screen.dart';
 import '../progress/progress_screen.dart';
@@ -17,6 +21,25 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   final _controller = CupertinoTabController();
+
+  @override
+  void initState() {
+    super.initState();
+    _syncProgress();
+  }
+
+  /// Vérifie la session et récupère le nombre de mots appris sur le serveur.
+  Future<void> _syncProgress() async {
+    try {
+      final me = await authService.refresh();
+      learnerStore.setName(me['name'] as String?);
+      final res = await api.get('/me/progress');
+      learnerStore.setLearnedTotal((res['words_learned'] as num).toInt());
+    } on RefreshException catch (e) {
+      // Jeton expiré ou compte supprimé : retour à l'accueil.
+      if (e.status == 401 && mounted) await endSession(context);
+    } catch (_) {/* hors ligne : on garde les valeurs locales */}
+  }
 
   @override
   void dispose() {

@@ -9,6 +9,8 @@ Les dossiers natifs Android/iOS ne sont pas encore générés. Dans ce dossier :
 ```bash
 flutter create . --org dz.amusnaw --project-name amusnaw --platforms android,ios
 flutter pub get
+dart run tool/patch_android.dart      # nom, permissions, notifications (relançable sans risque)
+dart run flutter_launcher_icons        # icône ⵣ
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000 --dart-define=GOOGLE_SERVER_CLIENT_ID=xxxx.apps.googleusercontent.com
 ```
 

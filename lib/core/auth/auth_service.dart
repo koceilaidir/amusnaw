@@ -14,6 +14,11 @@ class AuthException implements Exception {
   final String message;
 }
 
+class RefreshException implements Exception {
+  RefreshException(this.status);
+  final int status;
+}
+
 class AuthSession {
   AuthSession({required this.token, required this.userId, this.name});
   final String token;
@@ -88,6 +93,20 @@ class AuthService {
   }
 
   Future<String?> currentToken() => _storage.read(key: 'access_token');
+
+  /// Renouvelle le jeton (appelé à l'ouverture de l'app). Renvoie le profil
+  /// serveur, ou lève une exception HTTP (401 = session expirée).
+  Future<Map<String, dynamic>> refresh() async {
+    final token = await currentToken();
+    final res = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/refresh'),
+      headers: {if (token != null) 'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 20));
+    if (res.statusCode != 200) throw RefreshException(res.statusCode);
+    final json = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    await _storage.write(key: 'access_token', value: json['access_token'] as String);
+    return json['user'] as Map<String, dynamic>;
+  }
 
   /// Connexion de test (bêta, serveur avec DEV_LOGIN=true) : un compte par
   /// téléphone, sans Google ni Apple.

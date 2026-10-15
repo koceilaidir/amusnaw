@@ -34,10 +34,23 @@ STOP = {
 }
 
 
+# Mots-outils kabyles et mots communs au français qui ne doivent pas compter
+# comme « mots appris » (normalisés).
+KAB_FUNCTION_WORDS = {
+    "deg", "seg", "gef", "gur", "akked", "yid", "acu", "anwa", "ayen", "ara", "maca", "acku",
+    "imi", "ula", "ala", "kan", "aya", "agi", "nni", "ihi", "dga", "daga", "dayen", "tura",
+    "yella", "llan", "yiwen", "yiwet", "nek", "nekk", "kecc", "kemm", "netta", "nettat",
+    "nekni", "kunwi", "nutni", "inu", "iw", "ines", "nnes", "nneg", "nsen", "nwen", "mass",
+    "les", "des", "pour", "que", "qui", "une", "est", "pas", "par", "sur", "avec", "dans",
+}
+
+
 def fold(s: str) -> str:
-    """Minuscules, sans accents ni points souscrits : « Ṛemdan » → « remdan »."""
-    s = s.replace("ɛ", "e").replace("Ɛ", "e").replace("ɣ", "g").replace("Ɣ", "g")
-    s = unicodedata.normalize("NFD", s.lower())
+    """Minuscules, sans accents ni points souscrits : « Ṛemdan » → « remdan ».
+    Tolère les saisies au clavier ordinaire : « aghrum » = « aɣrum », « ε » = « ɛ »."""
+    s = s.lower()
+    s = s.replace("ɛ", "e").replace("ε", "e").replace("ɣ", "g").replace("γ", "g").replace("gh", "g")
+    s = unicodedata.normalize("NFD", s)
     return "".join(c for c in s if unicodedata.category(c) != "Mn")
 
 
@@ -58,12 +71,15 @@ class Item:
     source: str
     confident: bool = True
     status: str = "pending"  # pending | ok | fixed | rejected
+    domain: str = ""
     tokens: list[str] = field(default_factory=list)
 
 
 class KnowledgeBase:
     def __init__(self) -> None:
         self.items: dict[str, Item] = {}
+        # Vocabulaire kabyle attesté dans les livres : forme normalisée → forme écrite
+        self.kab_vocab: dict[str, str] = {}
         self._postings: dict[str, list[tuple[str, int]]] = defaultdict(list)
         self._len: dict[str, int] = {}
         self._avg = 1.0
@@ -75,7 +91,15 @@ class KnowledgeBase:
             return self
         for name in ("lexicon.jsonl", "glossaries.jsonl"):
             for row in _read_jsonl(d / name):
-                self._add("word", row["kab"], row["fr"], row.get("source", ""), True)
+                self._add("word", row["kab"], row["fr"], row.get("source", ""), True,
+                          row.get("domain", ""))
+        # Chansons sous licence : un vers par ligne (voir data/songs/README.md)
+        for row in _read_jsonl(d / "songs" / "songs.jsonl"):
+            fr = row.get("fr", "")
+            if row.get("hidden_meaning"):
+                fr += f" — Sens caché : {row['hidden_meaning']}"
+            self._add("song", row["kab"], fr,
+                      f"{row.get('artist', '')} — {row.get('title', '')}", True)
         for path in sorted(d.glob("parallel_*.jsonl")):
             for row in _read_jsonl(path):
                 self._add("pair", row["kab"], row["fr"], row.get("source", ""),
@@ -83,12 +107,12 @@ class KnowledgeBase:
         self._build()
         return self
 
-    def _add(self, kind, kab, fr, source, confident):
+    def _add(self, kind, kab, fr, source, confident, domain=""):
         kab, fr = kab.strip(), fr.strip()
         if not kab or not fr:
             return
         iid = item_id(kind, kab, fr)
-        self.items[iid] = Item(iid, kind, kab, fr, source, confident)
+        self.items[iid] = Item(iid, kind, kab, fr, source, confident, domain=domain)
 
     def _build(self):
         self._postings.clear()
@@ -98,6 +122,24 @@ class KnowledgeBase:
             for tok, n in Counter(it.tokens).items():
                 self._postings[tok].append((it.id, n))
         self._avg = sum(self._len.values()) / max(len(self._len), 1)
+        # Mots kabyles attestés au moins 2 fois (écarte les coquilles et les mots
+        # français isolés), forme écrite la plus fréquente.
+        forms: dict[str, Counter] = defaultdict(Counter)
+        for it in self.items.values():
+            for w in re.findall(r"[^\W\d_]+", it.kab):
+                if len(w) >= 3:
+                    forms[fold(w)][w.lower()] += 1
+        self.kab_vocab = {k: c.most_common(1)[0][0] for k, c in forms.items()
+                          if sum(c.values()) >= 2 and k not in STOP and k not in KAB_FUNCTION_WORDS}
+
+    def kabyle_words(self, text: str) -> dict[str, str]:
+        """Mots kabyles attestés présents dans un texte : clé normalisée → forme écrite."""
+        out = {}
+        for w in re.findall(r"[^\W\d_]+", text):
+            k = fold(w)
+            if len(k) >= 3 and k in self.kab_vocab:
+                out[k] = self.kab_vocab[k]
+        return out
 
     # ---------- relecture ----------
     def apply_review(self, iid: str, status: str, kab: str | None = None, fr: str | None = None):
@@ -140,9 +182,13 @@ class KnowledgeBase:
         """Bloc de texte injecté dans le prompt du prof."""
         words = self.search(message, "word", 6)
         pairs = self.search(message, "pair", 4)
-        if not words and not pairs:
+        songs = self.search(message, "song", 4)
+        if not words and not pairs and not songs:
             return ""
         lines = []
+        if songs:
+            lines.append("Chansons (vers sous licence, avec traduction et annotation) :")
+            lines += [f"- [{s.source}] KAB : {s.kab}\n  FR : {s.fr}" for s in songs]
         if words:
             lines.append("Vocabulaire :")
             lines += [f"- {w.kab} — {w.fr}" for w in words]

@@ -1,6 +1,9 @@
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../api/api_client.dart';
 
 /// Langue dans laquelle le prof explique.
 /// Au premier lancement : langue du téléphone si elle est supportée,
@@ -38,10 +41,26 @@ class LocaleController extends ValueNotifier<TutorLanguage> {
 
   Locale get locale => Locale(value.code);
 
-  void choose(TutorLanguage lang) {
+  static const _key = 'tutor_language';
+  SharedPreferences? _prefs;
+
+  void load(SharedPreferences prefs) {
+    _prefs = prefs;
+    final code = prefs.getString(_key);
+    if (code == null) return;
+    detected = false;
+    value = supportedTutorLanguages.firstWhere((l) => l.code == code, orElse: () => value);
+  }
+
+  /// Choix de l'utilisateur : enregistré sur le téléphone et envoyé au
+  /// serveur (le prof explique dans cette langue).
+  void choose(TutorLanguage lang, {bool syncServer = false}) {
     detected = false;
     value = lang;
-    // TODO: persister le choix (shared_preferences) et l'envoyer au serveur.
+    _prefs?.setString(_key, lang.code);
+    if (syncServer) {
+      api.patch('/me/language', {'interface_language': lang.code}).catchError((_) => <String, dynamic>{});
+    }
   }
 }
 

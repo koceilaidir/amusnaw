@@ -2,7 +2,7 @@
 
 Tout ce dossier est **généré** par les scripts de `data_pipeline/` à partir des livres fournis. Chaque ligne porte `needs_review: true` : rien n'est considéré comme validé tant qu'un linguiste ne l'a pas relu.
 
-⚠️ Ces textes viennent de livres protégés (publications HCA, traductions). Ne pas publier ce dossier (il est exclu de Git) et obtenir l'accord des ayants droit avant d'afficher ces contenus dans l'app.
+Les livres sources sont des publications du HCA, utilisées **avec l'autorisation du HCA** pour le projet Amusnaw (base du prof, contenus de l'app, entraînement d'amusnaw-v1). Le dossier reste exclu de Git : il ne doit pas être publié hors du projet.
 
 | Fichier | Contenu | Usage |
 |---|---|---|

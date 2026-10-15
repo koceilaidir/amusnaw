@@ -1,6 +1,6 @@
-/// Contenu de démonstration pour les premiers écrans.
-/// ⚠️ À faire relire par un linguiste, puis à remplacer par la base kabyle
-/// validée servie par le serveur.
+/// Modèles de contenu (leçons, exercices, capsules) + contenu de secours
+/// utilisé seulement si le serveur est injoignable. Le vrai contenu vient
+/// du serveur (/content/...), modifiable sans republier l'app.
 
 class ChoiceExercise {
   const ChoiceExercise({
@@ -12,7 +12,20 @@ class ChoiceExercise {
     required this.answer,
     this.translation,
     required this.explanation,
+    this.tifinagh,
   });
+
+  factory ChoiceExercise.fromJson(Map<String, dynamic> j) => ChoiceExercise(
+        id: j['id'] as String,
+        instruction: (j['instruction'] as String?) ?? 'WHAT DOES IT MEAN?',
+        before: j['before'] as String,
+        after: (j['after'] as String?) ?? '',
+        options: (j['options'] as List).cast<String>(),
+        answer: j['answer'] as String,
+        translation: j['translation'] as String?,
+        explanation: (j['explanation'] as String?) ?? '',
+        tifinagh: j['tifinagh'] as String?,
+      );
 
   final String id;
 
@@ -29,13 +42,25 @@ class ChoiceExercise {
   final String? translation;
   final String explanation;
 
+  /// Écriture tifinagh du mot (affichée en petit sous le mot).
+  final String? tifinagh;
+
   bool get hasBlank => after.isNotEmpty;
 }
 
 class CultureCapsule {
-  const CultureCapsule({required this.title, required this.body});
+  const CultureCapsule({required this.title, required this.body, this.kab = ''});
   final String title;
   final String body;
+
+  /// Titre ou expression en kabyle (« Aseggas ameggaz! »), peut être vide.
+  final String kab;
+
+  factory CultureCapsule.fromJson(Map<String, dynamic> j) => CultureCapsule(
+        title: j['title'] as String,
+        body: j['body'] as String,
+        kab: (j['kab'] as String?) ?? '',
+      );
 }
 
 class Lesson {
@@ -51,10 +76,39 @@ class Lesson {
   final String subtitle;
   final List<ChoiceExercise> exercises;
   final CultureCapsule? capsule;
+
+  factory Lesson.fromJson(Map<String, dynamic> j) => Lesson(
+        id: j['id'] as String,
+        title: j['title'] as String,
+        subtitle: (j['subtitle'] as String?) ?? '',
+        exercises: ((j['exercises'] as List?) ?? const [])
+            .map((e) => ChoiceExercise.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        capsule: j['capsule_data'] is Map<String, dynamic>
+            ? CultureCapsule.fromJson(j['capsule_data'] as Map<String, dynamic>)
+            : null,
+      );
+}
+
+/// Résumé d'une leçon pour la liste (sans les exercices).
+class LessonSummary {
+  const LessonSummary({required this.id, required this.title, required this.subtitle,
+      this.level = 'A1', this.count = 0});
+  final String id, title, subtitle, level;
+  final int count;
+
+  factory LessonSummary.fromJson(Map<String, dynamic> j) => LessonSummary(
+        id: j['id'] as String,
+        title: j['title'] as String,
+        subtitle: (j['subtitle'] as String?) ?? '',
+        level: (j['level'] as String?) ?? 'A1',
+        count: (j['count'] as num?)?.toInt() ?? 0,
+      );
 }
 
 const yennayer = CultureCapsule(
-  title: 'Aseggas ameggaz!',
+  kab: 'Aseggas ameggaz!',
+  title: 'Yennayer',
   body: '“Happy new year!” — wished on Yennayer, 12 January, when the Amazigh '
       'calendar turns. Families share a festive meal to bless the year ahead.',
 );
@@ -121,6 +175,12 @@ const a1Lessons = [
 class WordOfTheDay {
   const WordOfTheDay(this.word, this.tifinagh, this.meaning);
   final String word, tifinagh, meaning;
+
+  factory WordOfTheDay.fromJson(Map<String, dynamic> j) => WordOfTheDay(
+        j['kab'] as String,
+        (j['tifinagh'] as String?) ?? '',
+        j['fr'] as String,
+      );
 }
 
 const wordOfTheDay = WordOfTheDay('adrar', 'ⴰⴷⵔⴰⵔ', 'mountain');

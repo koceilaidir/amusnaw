@@ -1,0 +1,44 @@
+[
+  {
+    "id": "a1-first-words", "level": "A1", "order": 1,
+    "title": "At grandmother's table", "subtitle": "Greetings, water and bread",
+    "capsule": "yennayer", "needs_review": true,
+    "exercises": [
+      {"id": "amek-tellid", "instruction": "COMPLETE THE GREETING", "before": "Azul! Amek ", "after": "?",
+       "options": ["tellid", "aman", "adrar"], "answer": "tellid",
+       "translation": "Hello! How are you? (to a man)",
+       "explanation": "Kabyle changes the verb for who you speak to. To a woman, you'd say Amek tellam?"},
+      {"id": "aman", "instruction": "WHAT DOES IT MEAN?", "before": "aman",
+       "options": ["water", "bread", "house"], "answer": "water",
+       "explanation": "Aman is water — one of the first words children hear at the table."},
+      {"id": "aghrum", "instruction": "WHAT DOES IT MEAN?", "before": "aɣrum",
+       "options": ["mountain", "bread", "water"], "answer": "bread",
+       "explanation": "Aɣrum is bread. The letter ɣ sounds like a French r, from the throat."},
+      {"id": "tanemmirt", "instruction": "WHAT DOES IT MEAN?", "before": "Tanemmirt",
+       "options": ["Goodbye", "Thank you", "Hello"], "answer": "Thank you",
+       "explanation": "Tanemmirt — thank you. Use it generously, it opens every door."},
+      {"id": "axxam", "instruction": "WHAT DOES IT MEAN?", "before": "axxam",
+       "options": ["house", "friend", "sun"], "answer": "house",
+       "explanation": "Axxam is the house — and the family who lives in it."}
+    ]
+  },
+  {
+    "id": "a1-family", "level": "A1", "order": 2,
+    "title": "The family", "subtitle": "Yemma, baba and the others",
+    "capsule": "tajmaet", "needs_review": true,
+    "exercises": [
+      {"id": "yemma", "instruction": "WHAT DOES IT MEAN?", "before": "yemma",
+       "options": ["my mother", "my sister", "my aunt"], "answer": "my mother",
+       "explanation": "Yemma — my mother. You'll hear it in many songs."},
+      {"id": "baba", "instruction": "WHAT DOES IT MEAN?", "before": "baba",
+       "options": ["my brother", "my father", "my uncle"], "answer": "my father",
+       "explanation": "Baba — my father."},
+      {"id": "gma", "instruction": "WHAT DOES IT MEAN?", "before": "gma",
+       "options": ["my brother", "my son", "my friend"], "answer": "my brother",
+       "explanation": "Gma — my brother."},
+      {"id": "weltma", "instruction": "WHAT DOES IT MEAN?", "before": "weltma",
+       "options": ["my mother", "my sister", "my daughter"], "answer": "my sister",
+       "explanation": "Weltma — my sister."}
+    ]
+  }
+]

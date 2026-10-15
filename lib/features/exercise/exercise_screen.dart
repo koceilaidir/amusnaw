@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../content/sample_content.dart';
+import '../../core/api/api_client.dart';
 import '../../core/learning/learner_store.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/filigree.dart';
@@ -21,7 +22,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   int _index = 0;
   String? _picked;
   bool _missedOnce = false;
-  bool _showCapsule = false;
+  late bool _showCapsule = widget.lesson.exercises.isEmpty && widget.lesson.capsule != null;
 
   List<ChoiceExercise> get _items => widget.lesson.exercises;
   ChoiceExercise get _ex => _items[_index];
@@ -32,6 +33,11 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     setState(() => _picked = option);
     final correct = option == _ex.answer;
     if (correct) {
+      // Le mot est « découvert » aujourd'hui ; il comptera comme appris quand
+      // l'élève l'emploiera dans une conversation un autre jour.
+      api.post('/learning/seen', {
+        'words': [_ex.hasBlank ? _ex.answer : _ex.before],
+      }).catchError((_) => <String, dynamic>{});
       learnerStore.recordAnswer(
         id: _ex.id,
         kabyle: _ex.hasBlank ? _ex.answer : _ex.before,
@@ -63,7 +69,20 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final progress = _showCapsule ? 1.0 : (_index + (_correct ? 1 : 0)) / _items.length;
+    if (_items.isEmpty && !_showCapsule) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('This lesson is coming soon.', style: TextStyle(fontSize: 17, color: p.text2)),
+              const SizedBox(height: 16),
+              CupertinoButton(child: const Text('Close'), onPressed: () => Navigator.of(context).pop(false)),
+            ]),
+          ),
+        ),
+      );
+    }
+    final progress = _showCapsule || _items.isEmpty ? 1.0 : (_index + (_correct ? 1 : 0)) / _items.length;
 
     return Scaffold(
       body: SafeArea(
@@ -147,6 +166,13 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                 )
               else
                 Text(ex.before, style: AppTheme.serif(size: 40, color: p.text)),
+              if (ex.tifinagh != null && ex.tifinagh!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                ExcludeSemantics(
+                  child: Text(ex.tifinagh!,
+                      style: AppTheme.tifinagh(size: 16, color: p.text2).copyWith(letterSpacing: 2)),
+                ),
+              ],
               if (ex.translation != null) ...[
                 const SizedBox(height: 8),
                 Text(ex.translation!, style: TextStyle(fontSize: 17, color: p.text2)),
@@ -155,21 +181,26 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        Row(
-          children: [
-            for (final o in ex.options) ...[
-              Expanded(child: _OptionButton(
-                label: o,
-                state: _picked != o
-                    ? _OptionState.idle
-                    : (o == ex.answer ? _OptionState.right : _OptionState.wrong),
-                dimmed: answered && _correct && o != ex.answer,
-                onTap: () => _pick(o),
-              )),
-              if (o != ex.options.last) const SizedBox(width: 10),
+        // Options courtes : côte à côte ; longues (définitions) : empilées.
+        if (ex.options.every((o) => o.length <= 12))
+          Row(
+            children: [
+              for (final o in ex.options) ...[
+                Expanded(child: _option(ex, o, answered)),
+                if (o != ex.options.last) const SizedBox(width: 10),
+              ],
             ],
-          ],
-        ),
+          )
+        else
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final o in ex.options) ...[
+                _option(ex, o, answered),
+                if (o != ex.options.last) const SizedBox(height: 10),
+              ],
+            ],
+          ),
         const SizedBox(height: 20),
         if (answered)
           AppCard(
@@ -196,11 +227,20 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
     );
   }
 
+  Widget _option(ChoiceExercise ex, String o, bool answered) => _OptionButton(
+        label: o,
+        state: _picked != o
+            ? _OptionState.idle
+            : (o == ex.answer ? _OptionState.right : _OptionState.wrong),
+        dimmed: answered && _correct && o != ex.answer,
+        onTap: () => _pick(o),
+      );
+
   Widget _capsule(AppPalette p) {
     final c = widget.lesson.capsule!;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return ListView(
       children: [
+        const SizedBox(height: 24),
         ClipRRect(
           borderRadius: BorderRadius.circular(22),
           child: Stack(
@@ -211,9 +251,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Caption('Culture', color: p.gold),
+                    Caption('Culture · ${c.title}', color: p.gold),
                     const SizedBox(height: 6),
-                    Text(c.title, style: AppTheme.serif(size: 26, color: p.text)),
+                    Text(c.kab.isNotEmpty ? c.kab : c.title, style: AppTheme.serif(size: 26, color: p.text)),
                     const SizedBox(height: 8),
                     Text(c.body, style: TextStyle(fontSize: 16, height: 1.5, color: p.text)),
                   ],
@@ -252,7 +292,8 @@ class _OptionButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        height: 52,
+        constraints: const BoxConstraints(minHeight: 52),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: bg,

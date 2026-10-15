@@ -26,6 +26,26 @@ class MemoryCard {
   DateTime due;
 
   bool isDue(DateTime now) => !due.isAfter(now);
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'kabyle': kabyle,
+        'translation': translation,
+        'repetitions': repetitions,
+        'intervalDays': intervalDays,
+        'ease': ease,
+        'due': due.toIso8601String(),
+      };
+
+  factory MemoryCard.fromJson(Map<String, dynamic> j) => MemoryCard(
+        id: j['id'] as String,
+        kabyle: j['kabyle'] as String,
+        translation: (j['translation'] as String?) ?? '',
+        repetitions: (j['repetitions'] as num?)?.toInt() ?? 0,
+        intervalDays: (j['intervalDays'] as num?)?.toInt() ?? 0,
+        ease: (j['ease'] as num?)?.toDouble() ?? 2.5,
+        due: DateTime.tryParse((j['due'] as String?) ?? ''),
+      );
 }
 
 class SpacedRepetition {

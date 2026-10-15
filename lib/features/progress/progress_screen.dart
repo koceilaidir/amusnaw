@@ -61,7 +61,7 @@ class ProgressScreen extends StatelessWidget {
                               Text('The beginning · $pct%', style: TextStyle(fontSize: 15, color: p.text2)),
                               const SizedBox(height: 8),
                               Wrap(spacing: 16, children: [
-                                _Stat(s.wordsRemembered, 'words'),
+                                _Stat(s.learnedTotal, 'words'),
                                 _Stat(s.chats, 'chats'),
                                 _Stat(s.capsules, 'stories'),
                               ]),

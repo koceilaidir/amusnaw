@@ -60,6 +60,26 @@ class ChatMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class LearnedWord(Base):
+    """Un mot kabyle rencontré par l'élève.
+
+    introduced_at : premier jour où le prof (ou un exercice) le lui a montré.
+    mastered_at   : premier jour où l'élève l'a employé LUI-MÊME, un autre jour
+                    que celui où il l'a découvert → il compte comme « appris ».
+    """
+
+    __tablename__ = "learned_words"
+    __table_args__ = (UniqueConstraint("user_id", "word_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    word_key: Mapped[str] = mapped_column(String(80))  # forme normalisée (sans points, ɣ→g…)
+    display: Mapped[str] = mapped_column(String(80))   # forme écrite à montrer
+    source: Mapped[str] = mapped_column(String(12), default="tutor")  # tutor | exercise
+    introduced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    mastered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Review(Base):
     """Décision du linguiste sur une entrée de la base (mot ou paire)."""
 

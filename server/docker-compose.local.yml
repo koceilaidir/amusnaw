@@ -2,7 +2,8 @@
 #
 #   cd server
 #   docker compose -f docker-compose.local.yml up -d --build
-#   docker compose -f docker-compose.local.yml exec ollama ollama pull qwen2.5:3b
+#   docker compose -f docker-compose.local.yml exec ollama ollama pull modelscope.cn/Qwen/Qwen2.5-3B-Instruct-GGUF:Q4_K_M
+#   (hors de Chine : ollama pull qwen2.5:3b, et LLM_MODEL=qwen2.5:3b)
 #
 # API : http://<IP-du-PC>:8000   ·   Relecture : http://localhost:8000/review (code : kabyle)
 services:
@@ -30,9 +31,13 @@ services:
       REVIEW_TOKEN: kabyle     # code de la page /review
       LLM_BASE_URL: http://ollama:11434/v1
       LLM_API_KEY: ollama
-      LLM_MODEL: qwen2.5:3b    # rapide sur un PC sans GPU ; qwen2.5:7b = meilleur mais plus lent
+      # Modèle (doit être téléchargé dans Ollama sous ce nom exact).
+      # Depuis la Chine : miroir ModelScope (le registre Ollama passe par Cloudflare, bloqué).
+      # Ailleurs : LLM_MODEL=qwen2.5:3b
+      LLM_MODEL: ${LLM_MODEL:-modelscope.cn/Qwen/Qwen2.5-3B-Instruct-GGUF:Q4_K_M}
     volumes:
       - ./prompts:/app/prompts:ro
+      - ./content:/app/content:ro
       - ../data:/app/data:ro
     depends_on:
       db:

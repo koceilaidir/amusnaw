@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'spaced_repetition.dart';
 
-/// État local de l'apprenant. Pour l'instant en mémoire ;
-/// TODO : persister localement et synchroniser avec le serveur.
+/// État local de l'apprenant, enregistré sur le téléphone (shared_preferences).
+/// Le nombre de mots appris fait foi côté serveur et est resynchronisé.
 class LearnerState {
   const LearnerState({
     this.name = '',
@@ -11,6 +14,7 @@ class LearnerState {
     this.chats = 0,
     this.capsules = 0,
     this.lastSessionAt,
+    this.learnedTotal = 0,
     this.skills = const {
       'Vocabulary': 0,
       'Understanding': 0,
@@ -25,19 +29,53 @@ class LearnerState {
   final int capsules;
   final DateTime? lastSessionAt;
 
+  /// Mots « appris » selon le serveur : découverts un jour, réemployés par
+  /// l'élève lui-même un autre jour dans une conversation.
+  final int learnedTotal;
+
   /// 0..1 par compétence.
   final Map<String, double> skills;
 
   /// Mots solides : revus avec succès au moins une fois.
   int get wordsRemembered => cards.values.where((c) => c.repetitions > 0).length;
 
-  /// Progression dans le niveau A1 (objectif indicatif : 150 mots).
-  double get levelProgress => (wordsRemembered / 150).clamp(0, 1).toDouble();
+  /// Progression dans le niveau A1 (objectif indicatif : 150 mots appris).
+  double get levelProgress => (learnedTotal / 150).clamp(0, 1).toDouble();
 
   int get dueCount => SpacedRepetition.dueToday(cards.values.toList(), max: 99).length;
 
   int daysAway(DateTime now) =>
       lastSessionAt == null ? 0 : now.difference(lastSessionAt!).inDays;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'cards': [for (final c in cards.values) c.toJson()],
+        'chats': chats,
+        'capsules': capsules,
+        'lastSessionAt': lastSessionAt?.toIso8601String(),
+        'learnedTotal': learnedTotal,
+        'skills': skills,
+      };
+
+  factory LearnerState.fromJson(Map<String, dynamic> j) {
+    const empty = LearnerState();
+    return LearnerState(
+      name: (j['name'] as String?) ?? '',
+      cards: {
+        for (final c in (j['cards'] as List? ?? const []).cast<Map<String, dynamic>>())
+          c['id'] as String: MemoryCard.fromJson(c),
+      },
+      chats: (j['chats'] as num?)?.toInt() ?? 0,
+      capsules: (j['capsules'] as num?)?.toInt() ?? 0,
+      lastSessionAt: DateTime.tryParse((j['lastSessionAt'] as String?) ?? ''),
+      learnedTotal: (j['learnedTotal'] as num?)?.toInt() ?? 0,
+      skills: {
+        ...empty.skills,
+        for (final e in ((j['skills'] as Map?) ?? const {}).entries)
+          e.key as String: (e.value as num).toDouble(),
+      },
+    );
+  }
 
   LearnerState copyWith({
     String? name,
@@ -45,6 +83,7 @@ class LearnerState {
     int? chats,
     int? capsules,
     DateTime? lastSessionAt,
+    int? learnedTotal,
     Map<String, double>? skills,
   }) =>
       LearnerState(
@@ -53,12 +92,36 @@ class LearnerState {
         chats: chats ?? this.chats,
         capsules: capsules ?? this.capsules,
         lastSessionAt: lastSessionAt ?? this.lastSessionAt,
+        learnedTotal: learnedTotal ?? this.learnedTotal,
         skills: skills ?? this.skills,
       );
 }
 
 class LearnerStore extends ValueNotifier<LearnerState> {
   LearnerStore() : super(const LearnerState());
+
+  static const _key = 'learner_state_v1';
+  SharedPreferences? _prefs;
+
+  /// Charge l'état enregistré puis l'enregistre à chaque changement.
+  Future<void> load(SharedPreferences prefs) async {
+    _prefs = prefs;
+    final raw = prefs.getString(_key);
+    if (raw != null) {
+      try {
+        value = LearnerState.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      } catch (_) {/* format inattendu : on repart de zéro */}
+    }
+    addListener(_save);
+  }
+
+  void _save() => _prefs?.setString(_key, jsonEncode(value.toJson()));
+
+  /// Déconnexion ou suppression du compte : on efface tout.
+  Future<void> reset() async {
+    value = const LearnerState();
+    await _prefs?.remove(_key);
+  }
 
   void setName(String? name) {
     if (name != null && name.isNotEmpty) value = value.copyWith(name: name.split(' ').first);
@@ -96,6 +159,10 @@ class LearnerStore extends ValueNotifier<LearnerState> {
       capsules: value.capsules + (withCapsule ? 1 : 0),
       skills: skills,
     );
+  }
+
+  void setLearnedTotal(int total) {
+    if (total != value.learnedTotal) value = value.copyWith(learnedTotal: total);
   }
 
   void recordChat() {

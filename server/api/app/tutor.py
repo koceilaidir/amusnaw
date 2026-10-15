@@ -2,6 +2,7 @@
 la culture kabyles, et appelle le modèle (tout serveur compatible OpenAI :
 Ollama, vLLM avec notre propre modèle, ou une API)."""
 
+import json
 import re
 from pathlib import Path
 
@@ -48,7 +49,8 @@ def off_topic_reply(language: str) -> str:
 
 
 def build_system_prompt(user: User, profile: LearnerProfile, *, days_away: int,
-                        session_plan: str, references: str) -> str:
+                        session_plan: str, references: str,
+                        words_to_reuse: list[str] | None = None) -> str:
     template = (Path(get_settings().prompts_dir) / "tutor_system_prompt.md").read_text("utf-8")
     body = template.split("---", 1)[-1]
     values = {
@@ -61,10 +63,36 @@ def build_system_prompt(user: User, profile: LearnerProfile, *, days_away: int,
         "days_away": str(days_away),
         "session_plan": session_plan,
         "validated_lexicon_and_examples": references or "(none provided)",
+        "words_to_reuse": ", ".join(words_to_reuse or []) or "(none yet)",
     }
     for key, val in values.items():
         body = body.replace("{{" + key + "}}", val)
     return body.strip()
+
+
+async def stream_model(system: str, history: list[dict], message: str):
+    """Génère la réponse morceau par morceau (format SSE compatible OpenAI)."""
+    s = get_settings()
+    messages = [{"role": "system", "content": system}, *history, {"role": "user", "content": message}]
+    async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=10)) as client:
+        async with client.stream(
+            "POST", f"{s.llm_base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {s.llm_api_key}"},
+            json={"model": s.llm_model, "messages": messages, "temperature": 0.4, "stream": True},
+        ) as r:
+            r.raise_for_status()
+            async for line in r.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                data = line[5:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    delta = json.loads(data)["choices"][0]["delta"].get("content")
+                except (ValueError, KeyError, IndexError):
+                    continue
+                if delta:
+                    yield delta
 
 
 async def ask_model(system: str, history: list[dict], message: str) -> str:

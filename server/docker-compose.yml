@@ -25,6 +25,7 @@ services:
       DATABASE_URL: postgresql+psycopg://amusnaw:${POSTGRES_PASSWORD}@db:5432/amusnaw
     volumes:
       - ./prompts:/app/prompts:ro
+      - ./content:/app/content:ro
       - ../data:/app/data:ro   # base kabyle (lexique, paires) — à copier sur le VPS
     depends_on:
       db:
