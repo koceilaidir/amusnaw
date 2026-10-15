@@ -61,7 +61,7 @@ if [ ! -f "$ENV" ]; then
 API_DOMAIN=${API_DOMAIN}
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 JWT_SECRET=$(openssl rand -hex 32)
-JWT_DAYS=30
+JWT_DAYS=90
 GOOGLE_CLIENT_IDS=
 APPLE_CLIENT_IDS=dz.amusnaw.amusnaw
 LLM_BASE_URL=http://ollama:11434/v1
@@ -95,4 +95,6 @@ say "Terminé"
 echo "Santé de l'API   : https://${DOMAIN}/health"
 echo "Relecture        : https://${DOMAIN}/review"
 echo "Envoie les données depuis ton PC :"
-echo "  scp -r data/* root@<IP-du-VPS>:${DIR}/data/   puis   docker compose restart api"
+echo "  scp -r data/* root@<IP-du-VPS>:${DIR}/data/"
+echo "puis sur le VPS :"
+echo "  chmod -R a+rX ${DIR}/data && cd ${DIR}/server && docker compose restart api"

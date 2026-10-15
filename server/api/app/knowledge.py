@@ -199,13 +199,24 @@ class KnowledgeBase:
 
 
 def _read_jsonl(path: Path):
-    if not path.exists():
+    """Lit un fichier JSONL. Un fichier absent, illisible (droits) ou une
+    ligne abîmée est ignoré avec un avertissement : l'API démarre quand même."""
+    try:
+        if not path.exists():
+            return
+        f = open(path, encoding="utf-8")
+    except OSError as e:
+        print(f"[knowledge] fichier ignoré ({e})", flush=True)
         return
-    with open(path, encoding="utf-8") as f:
-        for line in f:
+    with f:
+        for n, line in enumerate(f, 1):
             line = line.strip()
-            if line:
+            if not line:
+                continue
+            try:
                 yield json.loads(line)
+            except json.JSONDecodeError:
+                print(f"[knowledge] {path.name}:{n} ligne ignorée (JSON invalide)", flush=True)
 
 
 kb = KnowledgeBase()
