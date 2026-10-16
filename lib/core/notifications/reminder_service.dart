@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -20,12 +19,28 @@ class ReminderService {
     'de': ('Azul!', 'Heute fünf Minuten Kabylisch? Dein Lehrer wartet.'),
   };
 
+  /// Fuseau du téléphone, retrouvé d'après son décalage horaire actuel
+  /// (évite un plugin natif). On privilégie quelques fuseaux connus.
+  static tz.Location _localLocation() {
+    final offset = DateTime.now().timeZoneOffset.inMilliseconds;
+    const preferred = [
+      'Africa/Algiers', 'Europe/Paris', 'Asia/Shanghai', 'Europe/London',
+      'America/Montreal', 'America/New_York', 'Europe/Berlin', 'Europe/Madrid',
+    ];
+    final now = DateTime.now().millisecondsSinceEpoch;
+    bool matches(tz.Location l) => l.timeZone(now).offset == offset;
+    for (final name in preferred) {
+      final l = tz.getLocation(name);
+      if (matches(l)) return l;
+    }
+    return tz.timeZoneDatabase.locations.values.firstWhere(matches, orElse: () => tz.UTC);
+  }
+
   Future<void> init() async {
     if (_ready || kIsWeb) return;
     try {
       tzdata.initializeTimeZones();
-      final name = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(name));
+      tz.setLocalLocation(_localLocation());
     } catch (_) {
       // fuseau inconnu : on garde UTC, le rappel sera simplement décalé
     }
