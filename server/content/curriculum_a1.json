@@ -1,0 +1,250 @@
+{
+  "level": "A1",
+  "title": "Tazwara — les premiers pas",
+  "method": "Unités courtes (5 mots nouveaux au plus) organisées par tâches du CECRL ; blocs de langue appris tels quels ; reconnaissance puis rappel ; révision entrelacée des unités précédentes ; une capsule culturelle par unité. Voir docs/PEDAGOGIE.md.",
+  "needs_review": true,
+  "units": [
+    {
+      "id": "a1-01-azul", "order": 1,
+      "title": "Azul ! Saluer", "subtitle": "Dire bonjour, demander comment ça va",
+      "can_do": "Je peux saluer quelqu'un, demander comment il va, répondre et remercier.",
+      "capsule": "tifinagh",
+      "words": [
+        {"kab": "azul", "fr": "bonjour, salut"},
+        {"kab": "tanemmirt", "fr": "merci"},
+        {"kab": "labas", "fr": "ça va, bien"},
+        {"kab": "ih", "fr": "oui"},
+        {"kab": "ala", "fr": "non"}
+      ],
+      "chunks": [
+        {"kab": "Azul fell-ak !", "fr": "Bonjour à toi ! (à un homme)", "blank": "fell-ak"},
+        {"kab": "Azul fell-am !", "fr": "Bonjour à toi ! (à une femme)", "blank": "fell-am"},
+        {"kab": "Amek telliḍ ?", "fr": "Comment vas-tu ?", "blank": "telliḍ"},
+        {"kab": "Labas, tanemmirt.", "fr": "Ça va, merci.", "blank": "tanemmirt"},
+        {"kab": "Ar timlilit !", "fr": "Au revoir ! (à la prochaine rencontre)"}
+      ],
+      "tutor_focus": "Faire saluer l'élève avec « Azul fell-ak / fell-am », demander « Amek telliḍ ? » et le faire répondre « Labas, tanemmirt ». Expliquer que fell-ak s'adresse à un homme et fell-am à une femme."
+    },
+    {
+      "id": "a1-02-isem", "order": 2,
+      "title": "Se présenter", "subtitle": "Mon nom, d'où je viens",
+      "can_do": "Je peux dire mon nom, demander celui de l'autre et dire d'où je viens.",
+      "capsule": "tajmaet",
+      "words": [
+        {"kab": "isem", "fr": "le nom, le prénom"},
+        {"kab": "nekk", "fr": "moi"},
+        {"kab": "kečč", "fr": "toi (homme)"},
+        {"kab": "kemm", "fr": "toi (femme)"},
+        {"kab": "taddart", "fr": "le village"}
+      ],
+      "chunks": [
+        {"kab": "Isem-iw Koceila.", "fr": "Je m'appelle Koceila.", "blank": "Isem-iw"},
+        {"kab": "Amek isem-ik ?", "fr": "Comment t'appelles-tu ? (à un homme)", "blank": "isem-ik"},
+        {"kab": "Amek isem-im ?", "fr": "Comment t'appelles-tu ? (à une femme)", "blank": "isem-im"},
+        {"kab": "Ansi i d-tekkiḍ ?", "fr": "D'où viens-tu ?"}
+      ],
+      "tutor_focus": "Faire dire « Isem-iw … » et demander le nom (isem-ik / isem-im). Demander de quel village vient la famille de l'élève."
+    },
+    {
+      "id": "a1-03-tawacult", "order": 3,
+      "title": "La famille", "subtitle": "Yemma, baba et les autres",
+      "can_do": "Je peux présenter les membres de ma famille.",
+      "capsule": "fadhma",
+      "words": [
+        {"kab": "yemma", "fr": "ma mère"},
+        {"kab": "baba", "fr": "mon père"},
+        {"kab": "gma", "fr": "mon frère"},
+        {"kab": "weltma", "fr": "ma sœur"},
+        {"kab": "tawacult", "fr": "la famille"}
+      ],
+      "chunks": [
+        {"kab": "D yemma.", "fr": "C'est ma mère.", "blank": "yemma"},
+        {"kab": "Wa d gma.", "fr": "Celui-ci, c'est mon frère.", "blank": "gma"},
+        {"kab": "Tawacult-iw", "fr": "ma famille", "blank": "Tawacult"}
+      ],
+      "tutor_focus": "Faire présenter la famille avec « D … » (c'est…) et « Wa d … » (celui-ci, c'est…). Rappeler que yemma, baba, gma, weltma contiennent déjà « mon / ma »."
+    },
+    {
+      "id": "a1-04-amḍan-1", "order": 4,
+      "title": "Compter de 1 à 5", "subtitle": "Yiwen, sin, kraḍ…",
+      "can_do": "Je peux compter de 1 à 5 et dire un nombre de jours.",
+      "capsule": "tiwizi",
+      "words": [
+        {"kab": "yiwen", "fr": "un"},
+        {"kab": "sin", "fr": "deux"},
+        {"kab": "kraḍ", "fr": "trois"},
+        {"kab": "kkuẓ", "fr": "quatre"},
+        {"kab": "semmus", "fr": "cinq"}
+      ],
+      "chunks": [
+        {"kab": "yiwen n wass", "fr": "un jour", "blank": "yiwen"},
+        {"kab": "kraḍ n wussan", "fr": "trois jours", "blank": "kraḍ"},
+        {"kab": "yiwet n tikkelt", "fr": "une fois (yiwet : forme féminine de « un »)", "blank": "yiwet"}
+      ],
+      "tutor_focus": "Faire compter de 1 à 5 et utiliser « … n wussan » (… jours). Signaler que yiwen et sin ont une forme féminine : yiwet, snat."
+    },
+    {
+      "id": "a1-05-amḍan-2", "order": 5,
+      "title": "Compter de 6 à 10", "subtitle": "Sḍis, sa, tam…",
+      "can_do": "Je peux compter jusqu'à 10.",
+      "capsule": "tifinagh",
+      "words": [
+        {"kab": "sḍis", "fr": "six"},
+        {"kab": "sa", "fr": "sept"},
+        {"kab": "tam", "fr": "huit"},
+        {"kab": "tẓa", "fr": "neuf"},
+        {"kab": "mraw", "fr": "dix"}
+      ],
+      "chunks": [
+        {"kab": "mraw n wussan", "fr": "dix jours", "blank": "mraw"},
+        {"kab": "snat n tikkal", "fr": "deux fois", "blank": "snat"}
+      ],
+      "tutor_focus": "Faire compter de 1 à 10 dans l'ordre puis dans le désordre. Petit jeu : l'élève dit un nombre, le prof dit le suivant."
+    },
+    {
+      "id": "a1-06-imensi", "order": 6,
+      "title": "À la table de grand-mère", "subtitle": "L'eau, le pain, le couscous",
+      "can_do": "Je peux demander à boire et à manger poliment.",
+      "capsule": "yennayer",
+      "words": [
+        {"kab": "aman", "fr": "l'eau"},
+        {"kab": "aɣrum", "fr": "le pain"},
+        {"kab": "seksu", "fr": "le couscous"},
+        {"kab": "tamemt", "fr": "le miel"},
+        {"kab": "zzit", "fr": "l'huile (d'olive)"}
+      ],
+      "chunks": [
+        {"kab": "Efk-iyi-d aman, ma ulac aɣilif.", "fr": "Donne-moi de l'eau, s'il te plaît.", "blank": "aman"},
+        {"kab": "Bɣiɣ aɣrum.", "fr": "Je veux du pain.", "blank": "aɣrum"},
+        {"kab": "Ad nečč seksu.", "fr": "Nous allons manger du couscous.", "blank": "seksu"}
+      ],
+      "tutor_focus": "Jeu de rôle à table : l'élève demande de l'eau et du pain avec « Efk-iyi-d …, ma ulac aɣilif » et remercie avec « tanemmirt »."
+    },
+    {
+      "id": "a1-07-axxam", "order": 7,
+      "title": "La maison", "subtitle": "Axxam, tawwurt, lkanun",
+      "can_do": "Je peux nommer les parties de la maison et inviter quelqu'un à entrer.",
+      "capsule": "poterie",
+      "words": [
+        {"kab": "axxam", "fr": "la maison"},
+        {"kab": "tawwurt", "fr": "la porte"},
+        {"kab": "taxxamt", "fr": "la chambre, la pièce"},
+        {"kab": "lkanun", "fr": "le foyer, l'âtre"},
+        {"kab": "tasarut", "fr": "la clé"}
+      ],
+      "chunks": [
+        {"kab": "Ldi tawwurt.", "fr": "Ouvre la porte.", "blank": "tawwurt"},
+        {"kab": "Kcem, ttxil-k !", "fr": "Entre, je t'en prie ! (à un homme)", "blank": "Kcem"}
+      ],
+      "tutor_focus": "Faire décrire la maison familiale ou celle des grands-parents au village, avec les mots de l'unité."
+    },
+    {
+      "id": "a1-08-tafekka", "order": 8,
+      "title": "Le corps", "subtitle": "Aqerru, afus, ul",
+      "can_do": "Je peux nommer quelques parties du corps et dire où j'ai mal.",
+      "capsule": "tabzimt",
+      "words": [
+        {"kab": "aqerru", "fr": "la tête"},
+        {"kab": "tiṭ", "fr": "l'œil (pluriel : allen)"},
+        {"kab": "afus", "fr": "la main"},
+        {"kab": "aḍar", "fr": "le pied, la jambe"},
+        {"kab": "ul", "fr": "le cœur"}
+      ],
+      "chunks": [
+        {"kab": "Iqreḥ-iyi uqerru-iw.", "fr": "J'ai mal à la tête.", "blank": "uqerru-iw"},
+        {"kab": "afus deg ufus", "fr": "main dans la main", "blank": "afus"}
+      ],
+      "tutor_focus": "Faire montrer et nommer les parties du corps ; expliquer qu'aqerru devient uqerru après certains mots (état d'annexion), sans entrer dans la théorie."
+    },
+    {
+      "id": "a1-09-tamurt", "order": 9,
+      "title": "Le village et la nature", "subtitle": "Adrar, asif, tala",
+      "can_do": "Je peux décrire le paysage d'un village kabyle.",
+      "capsule": "tiwizi",
+      "words": [
+        {"kab": "adrar", "fr": "la montagne"},
+        {"kab": "asif", "fr": "la rivière"},
+        {"kab": "tala", "fr": "la fontaine, la source"},
+        {"kab": "azemmur", "fr": "l'olivier, les olives"},
+        {"kab": "tamurt", "fr": "le pays"}
+      ],
+      "chunks": [
+        {"kab": "Taddart-nneɣ tecbeḥ.", "fr": "Notre village est beau.", "blank": "Taddart-nneɣ"},
+        {"kab": "Ad nali ɣer udrar.", "fr": "Nous allons monter à la montagne.", "blank": "udrar"}
+      ],
+      "tutor_focus": "Faire décrire le village de la famille (montagne, fontaine, oliviers) et parler de la cueillette des olives."
+    },
+    {
+      "id": "a1-10-akud", "order": 10,
+      "title": "Le temps qui passe", "subtitle": "Ass-a, azekka, iḍelli",
+      "can_do": "Je peux situer une action aujourd'hui, hier ou demain.",
+      "capsule": "yennayer",
+      "words": [
+        {"kab": "ass", "fr": "le jour"},
+        {"kab": "iḍ", "fr": "la nuit"},
+        {"kab": "ass-a", "fr": "aujourd'hui"},
+        {"kab": "azekka", "fr": "demain"},
+        {"kab": "iḍelli", "fr": "hier"}
+      ],
+      "chunks": [
+        {"kab": "Azekka ad nemlil.", "fr": "Demain, nous nous verrons.", "blank": "Azekka"},
+        {"kab": "Ar tufat !", "fr": "À demain !", "blank": "tufat"}
+      ],
+      "tutor_focus": "Demander ce que l'élève a fait hier et fera demain, en faisant employer ass-a, iḍelli et azekka."
+    },
+    {
+      "id": "a1-11-imyagen", "order": 11,
+      "title": "Les verbes du quotidien", "subtitle": "Manger, boire, partir",
+      "can_do": "Je peux donner des invitations simples (assieds-toi, mange, bois).",
+      "capsule": "tajmaet",
+      "words": [
+        {"kab": "ečč", "fr": "mange !"},
+        {"kab": "sew", "fr": "bois !"},
+        {"kab": "qqim", "fr": "assieds-toi !, reste !"},
+        {"kab": "ruḥ", "fr": "pars !, va !"},
+        {"kab": "ẓer", "fr": "vois !, regarde !"}
+      ],
+      "chunks": [
+        {"kab": "Qqim, ečč !", "fr": "Assieds-toi, mange !", "blank": "ečč"},
+        {"kab": "Ad nruḥ.", "fr": "Allons-y. (nous allons partir)", "blank": "nruḥ"}
+      ],
+      "tutor_focus": "Jeu de l'hospitalité : le prof reçoit l'élève à la maison ; l'élève répond aux invitations et en fait à son tour."
+    },
+    {
+      "id": "a1-12-initen", "order": 12,
+      "title": "Les couleurs", "subtitle": "Amellal, aberkan, azeggaɣ",
+      "can_do": "Je peux dire la couleur d'un objet.",
+      "capsule": "tabzimt",
+      "words": [
+        {"kab": "amellal", "fr": "blanc"},
+        {"kab": "aberkan", "fr": "noir"},
+        {"kab": "azeggaɣ", "fr": "rouge"},
+        {"kab": "azegzaw", "fr": "vert, bleu"},
+        {"kab": "awraɣ", "fr": "jaune"}
+      ],
+      "chunks": [
+        {"kab": "aɣrum amellal", "fr": "le pain blanc", "blank": "amellal"},
+        {"kab": "adrar azegzaw", "fr": "la montagne verte", "blank": "azegzaw"}
+      ],
+      "tutor_focus": "Faire décrire les couleurs d'une robe kabyle, d'une fibule (tabzimt) ou d'un paysage. Noter qu'azegzaw couvre le vert et le bleu."
+    },
+    {
+      "id": "a1-13-tameɣra", "order": 13,
+      "title": "Fêtes et culture", "subtitle": "Yennayer, tameɣra, tiwizi",
+      "can_do": "Je peux souhaiter une bonne année et parler d'une fête kabyle.",
+      "capsule": "tafsut",
+      "words": [
+        {"kab": "Yennayer", "fr": "Yennayer, le nouvel an amazigh"},
+        {"kab": "tameɣra", "fr": "la fête, le mariage"},
+        {"kab": "tiwizi", "fr": "l'entraide collective"},
+        {"kab": "tajmaɛt", "fr": "l'assemblée du village"},
+        {"kab": "taqbaylit", "fr": "la langue kabyle"}
+      ],
+      "chunks": [
+        {"kab": "Aseggas ameggaz !", "fr": "Bonne année !", "blank": "ameggaz"},
+        {"kab": "Tessneḍ taqbaylit ?", "fr": "Tu connais le kabyle ?", "blank": "taqbaylit"}
+      ],
+      "tutor_focus": "Parler des fêtes vécues par l'élève (Yennayer, mariage) et des traditions d'entraide ; faire souhaiter « Aseggas ameggaz »."
+    }
+  ]
+}

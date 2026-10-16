@@ -80,6 +80,7 @@ def _collapse_overstrike(tok: str) -> str:
 
 
 def table_for(font: str):
+    font = font.split("+", 1)[-1]  # « BBAZKR+AmazighTimesNewRoman » → nom réel
     if font.startswith("Tayma"):
         return TAYMA
     if font.startswith("Symbol"):

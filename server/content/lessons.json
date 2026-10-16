@@ -5,9 +5,9 @@
     "capsule": "yennayer", "needs_review": true,
     "exercises": [
       {"id": "amek-tellid", "instruction": "COMPLÈTE LA SALUTATION", "before": "Azul! Amek ", "after": "?",
-       "options": ["tellid", "aman", "adrar"], "answer": "tellid",
+       "options": ["telliḍ", "aman", "adrar"], "answer": "telliḍ",
        "translation": "Bonjour ! Comment vas-tu ?",
-       "explanation": "Amek tellid ? — comment vas-tu ? C'est la question qu'on pose juste après Azul."},
+       "explanation": "Amek telliḍ ? — comment vas-tu ? C'est la question qu'on pose juste après Azul."},
       {"id": "aman", "instruction": "QUE VEUT DIRE CE MOT ?", "before": "aman",
        "options": ["l'eau", "le pain", "la maison"], "answer": "l'eau",
        "explanation": "Aman, c'est l'eau — un des premiers mots qu'on entend à table."},

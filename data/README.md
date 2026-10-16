@@ -13,6 +13,14 @@ Les livres sources sont des publications du HCA, utilisées **avec l'autorisatio
 | `parallel_camus.jsonl` | Camus, *Misère de la Kabylie* (+ discours du Nobel) ↔ *Lḥif n tmurt n Leqbayel* | idem |
 | `parallel_feraoun.jsonl` | *Le fils du pauvre* (partie II) ↔ *Mmis n igellil* | idem |
 | `feraoun_kab.txt`, `petit_prince_kab.txt`, `camus_kab.txt`, `book2_text.txt` | Textes kabyles complets, convertis en Unicode | lecture, recherche, pré-entraînement |
+| `lexicon_tatrart.jsonl` | H. A. Mansouri, *Amawal n tmaziɣt tatrart* (HCA 2004) — 3 536 mots modernes, français → kabyle | dictionnaire du prof |
+| `lexicon_terre_animaux.jsonl` | A. Z. Yeddir, lexique des sciences de la terre + lexique animal (HCA 2004) — 236 entrées | dictionnaire, culture du village |
+| `lexicon_didactique.jsonl` | M. Mahrazi, *Lexique de didactique et des sciences du langage* (HCA 2013) — 1 818 termes | vocabulaire de la classe, grammaire |
+| `lexicon_prenoms.jsonl` | M. A. Haddadou, *Recueil de prénoms amazighs* (HCA 2003) — 1 117 prénoms et leur sens | sujet « prénoms amazighs » |
+| `lexicon_juridique.jsonl` | M. Z. Benramdane, *Amawal azerfan* (2013) et *Amawal n tutlayt tazerfant* (2021) — 7 784 termes | dictionnaire (poids réduit dans la recherche) |
+| `phrases_juridiques.jsonl` | Les 26 545 longues expressions des mêmes lexiques | non chargé par le prof ; réservé à l'entraînement |
+| `corpus_hca.jsonl` | 45 673 phrases kabyles authentiques tirées de 43 livres HCA (romans, contes, poésie, essais, histoire) | exemples d'emploi réel, fréquence des mots, pré-entraînement |
+| `word_freq.tsv` | Fréquence de chaque forme kabyle dans ce corpus | choix du vocabulaire courant, vérification des mots du programme |
 
 Champs des paires parallèles : `fr`, `kab`, `chapter`, `bead` (ex. `[1, 2]` = 1 phrase FR pour 2 phrases KAB), `cost` (plus bas = plus sûr), `confident` (estimation automatique : à relire en priorité les `false`).
 
@@ -32,6 +40,16 @@ python extract_glossaries.py livre_3.pdf ../data/petit_prince_kab.txt ../data/gl
 ```
 
 (Supprimer `lexicon.jsonl` et `sentences.jsonl` avant de relancer le premier script : il ajoute à la fin.)
+
+Le programme A1 (`server/content/curriculum_a1.json`) n'utilise que des mots attestés dans ce corpus ou ces lexiques (vérifié avec `word_freq.tsv`).
+
+Livres **non intégrés** : variétés autres que le kabyle (touareg, mozabite, chaoui, Ouargla, Atlas blidéen), actes de colloques en français ou en arabe, et les ouvrages qui ne sont pas des publications HCA (Assimil, Naït-Zerrad, Mammeri chez Maspero, paroles de chansons) : l'autorisation du HCA ne les couvre pas.
+
+```bash
+python build_corpus.py <dossier des livres> ../data/corpus_hca.jsonl ../data/word_freq.tsv
+python parse_amawal_tatrart.py ; python parse_amawal_akal.py ; python parse_didactique.py
+python parse_prenoms.py ; python parse_juridique.py
+```
 
 ## Points connus
 

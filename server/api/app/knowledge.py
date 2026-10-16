@@ -45,6 +45,10 @@ KAB_FUNCTION_WORDS = {
 }
 
 
+# Priorité des sources : le programme d'abord, les lexiques spécialisés ensuite.
+DOMAIN_WEIGHT = {"programme": 2.0, "droit": 0.6, "prénoms": 0.25, "langue et didactique": 0.8}
+
+
 def fold(s: str) -> str:
     """Minuscules, sans accents ni points souscrits : « Ṛemdan » → « remdan ».
     Tolère les saisies au clavier ordinaire : « aghrum » = « aɣrum », « ε » = « ɛ »."""
@@ -85,14 +89,34 @@ class KnowledgeBase:
         self._avg = 1.0
 
     # ---------- chargement ----------
-    def load(self, data_dir: str | Path) -> "KnowledgeBase":
+    def load(self, data_dir: str | Path, content_dir: str | Path | None = None) -> "KnowledgeBase":
         d = Path(data_dir)
+        content = Path(content_dir) if content_dir else d.parent / "content"
         if not d.exists():
             return self
-        for name in ("lexicon.jsonl", "glossaries.jsonl"):
-            for row in _read_jsonl(d / name):
+        lexicons = [d / "lexicon.jsonl", d / "glossaries.jsonl", *sorted(d.glob("lexicon_*.jsonl"))]
+        for path in lexicons:
+            for row in _read_jsonl(path):
+                # Les longues phrases du lexique juridique (« Corrompre les
+                # fonctionnaires du ministère de… ») n'apportent pas de vocabulaire.
+                if row.get("kind") == "phrase" or row.get("no_meaning"):
+                    continue
                 self._add("word", row["kab"], row["fr"], row.get("source", ""), True,
                           row.get("domain", ""))
+        # Programme A1 d'Amusnaw : mots et blocs de chaque unité (prioritaires).
+        for path in sorted(content.glob("curriculum_*.json")):
+            try:
+                cur = json.loads(path.read_text("utf-8"))
+            except (OSError, ValueError):
+                continue
+            for unit in cur.get("units", []):
+                src = f"Programme Amusnaw {cur.get('level', '')} — {unit.get('title', '')}"
+                for w in unit.get("words", []) + unit.get("chunks", []):
+                    self._add("word", w["kab"], w["fr"], src, True, "programme")
+        # Textes kabyles authentiques (romans, contes, essais HCA), sans traduction :
+        # exemples d'emploi réel des mots.
+        for row in _read_jsonl(d / "corpus_hca.jsonl"):
+            self._add("text", row["kab"], "", f"{row.get('source', '')}, p. {row.get('page', '?')}", True)
         # Chansons sous licence : un vers par ligne (voir data/songs/README.md)
         for row in _read_jsonl(d / "songs" / "songs.jsonl"):
             fr = row.get("fr", "")
@@ -109,7 +133,7 @@ class KnowledgeBase:
 
     def _add(self, kind, kab, fr, source, confident, domain=""):
         kab, fr = kab.strip(), fr.strip()
-        if not kab or not fr:
+        if not kab or (not fr and kind != "text"):
             return
         iid = item_id(kind, kab, fr)
         self.items[iid] = Item(iid, kind, kab, fr, source, confident, domain=domain)
@@ -125,12 +149,22 @@ class KnowledgeBase:
         # Mots kabyles attestés au moins 2 fois (écarte les coquilles et les mots
         # français isolés), forme écrite la plus fréquente.
         forms: dict[str, Counter] = defaultdict(Counter)
+        french: set[str] = set()
         for it in self.items.values():
+            french.update(fold(w) for w in re.findall(r"[^\W\d_]+", it.fr))
             for w in re.findall(r"[^\W\d_]+", it.kab):
                 if len(w) >= 3:
                     forms[fold(w)][w.lower()] += 1
-        self.kab_vocab = {k: c.most_common(1)[0][0] for k, c in forms.items()
-                          if sum(c.values()) >= 2 and k not in STOP and k not in KAB_FUNCTION_WORDS}
+        special = re.compile(r"[ɣɛḍṭẓṛṣḥčǧ]")
+
+        def keep(k: str, c: Counter) -> bool:
+            if sum(c.values()) < 2 or k in STOP or k in KAB_FUNCTION_WORDS:
+                return False
+            # Mot qui existe aussi en français (« leçon », « table ») : seulement
+            # s'il porte une lettre propre au kabyle.
+            return k not in french or bool(special.search(c.most_common(1)[0][0]))
+
+        self.kab_vocab = {k: c.most_common(1)[0][0] for k, c in forms.items() if keep(k, c)}
 
     def kabyle_words(self, text: str) -> dict[str, str]:
         """Mots kabyles attestés présents dans un texte : clé normalisée → forme écrite."""
@@ -174,16 +208,21 @@ class KnowledgeBase:
             if it.status == "pending" and not it.confident:
                 continue  # paire douteuse non relue : on ne la montre pas au prof
             bonus = 1.3 if it.status in ("ok", "fixed") else 1.0
+            bonus *= DOMAIN_WEIGHT.get(it.domain, 1.0)
+            if it.domain == "prénoms" and ("prenom" in q or "prenoms" in q):
+                bonus = 2.0
             ranked.append((sc * bonus, it))
         ranked.sort(key=lambda x: -x[0])
         return [it for _, it in ranked[:k]]
 
     def references_for(self, message: str) -> str:
         """Bloc de texte injecté dans le prompt du prof."""
-        words = self.search(message, "word", 6)
+        words = self.search(message, "word", 8)
         pairs = self.search(message, "pair", 4)
         songs = self.search(message, "song", 4)
-        if not words and not pairs and not songs:
+        # Exemples tirés des livres kabyles, seulement si l'élève cite un mot kabyle.
+        texts = self.search(message, "text", 2) if self.kabyle_words(message) else []
+        if not words and not pairs and not songs and not texts:
             return ""
         lines = []
         if songs:
@@ -195,6 +234,9 @@ class KnowledgeBase:
         if pairs:
             lines.append("Phrases authentiques (tirées de livres traduits) :")
             lines += [f"- KAB : {p.kab}\n  FR : {p.fr}" for p in pairs]
+        if texts:
+            lines.append("Exemples d'emploi dans des livres kabyles (sans traduction, à citer avec prudence) :")
+            lines += [f"- {t.kab} ({t.source})" for t in texts]
         return "\n".join(lines)
 
 

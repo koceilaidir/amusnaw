@@ -20,7 +20,7 @@ Ce document fixe comment le prof IA enseigne. Chaque règle vient d'un pédagogu
 | **Partir du vécu de l'apprenant** (thèmes générateurs) | Paulo Freire | Les thèmes viennent de sa vie : famille, repas, village, fêtes, chansons qu'il connaît. |
 | **Du concret à l'abstrait, le mot avec la chose** | Comenius | Vocabulaire toujours en situation, avec image ou contexte ; la grammaire vient après des exemples. |
 | **Autonomie et auto-correction** | Maria Montessori | Exercices qui montrent eux-mêmes la bonne réponse ; l'apprenant choisit le rythme. |
-| **Approche lexicale** : on apprend des blocs, pas des mots isolés. | Michael Lewis | On enseigne « Amek tellid? » comme un tout avant de décomposer. |
+| **Approche lexicale** : on apprend des blocs, pas des mots isolés. | Michael Lewis | On enseigne « Amek telliḍ ? » comme un tout avant de décomposer. |
 | **Les quatre piliers** : input, output, étude ciblée, fluidité. | Paul Nation | Chaque séance équilibre : écouter/lire, produire, une notion, une révision rapide. |
 | **Charge cognitive** | John Sweller | Séances de 5–10 min, une seule notion nouvelle par séance. |
 | **Double codage** | Allan Paivio | Mot + image + contexte culturel (quand la voix arrivera : + son). |
@@ -54,3 +54,55 @@ Ce document fixe comment le prof IA enseigne. Chaque règle vient d'un pédagogu
 - Libres : proverbes, contes et devinettes traditionnels, poésie ancienne (vérifier que la *transcription* utilisée n'est pas protégée).
 - Protégés (autorisation nécessaire) : œuvres de Mouloud Mammeri, paroles de chanteurs (Idir, Matoub, Aït Menguellet…), manuels et dictionnaires récents.
 - Tout texte kabyle de l'app est relu par un linguiste avant publication.
+
+## 5. Conception des leçons — programme A1 (`server/content/curriculum_a1.json`)
+
+Le programme A1 compte 13 unités. Chaque unité correspond à une tâche de communication du CECRL (« je peux saluer », « je peux demander à manger », « je peux présenter ma famille »…). Les exercices sont générés par le serveur (`content.py`), toujours dans le même ordre, et chaque choix vient d'un résultat de recherche.
+
+| Choix de conception | Pourquoi | Référence |
+|---|---|---|
+| Unités définies par une tâche réelle (« Je peux… »), niveau A1 | Apprendre pour agir, objectifs vérifiables | Conseil de l'Europe, CECRL (2001) et volume complémentaire (2020) ; Ellis (2003) |
+| 5 mots nouveaux au plus par unité ; les nombres 1–10 coupés en deux unités | Limiter la charge de la mémoire de travail | Sweller (1988) |
+| Mots courants d'abord, vérifiés dans le corpus de 45 000 phrases HCA (`word_freq.tsv`) | Les mots fréquents rapportent le plus de compréhension | Nation (2013) |
+| Blocs de langue appris tels quels (« Amek telliḍ ? », « Efk-iyi-d aman, ma ulac aɣilif ») avant toute grammaire | On parle d'abord avec des blocs, on les décompose ensuite | Lewis (1993) ; Nation (2013) |
+| 1) Reconnaissance (kabyle → sens), avec correction immédiate | Tenter de répondre avant d'avoir appris, puis recevoir la réponse, fait mieux retenir | Richland, Kornell & Kao (2009) |
+| 2) Bloc à compléter dans une phrase (cloze), avec la traduction | Le mot est vu dans son contexte, comme un tout | Lewis (1993) ; Comenius (1658) |
+| 3) Rappel (sens → kabyle), dans un ordre mélangé | Se rappeler activement fixe mieux que relire ; c'est une difficulté « désirable » | Roediger & Karpicke (2006) ; Bjork (1994) |
+| 4) Trois mots des unités précédentes reviennent dans chaque unité | Répétition espacée et entrelacement des contenus | Ebbinghaus (1885) ; Pimsleur (1967) ; Cepeda et al. (2006) ; Rohrer & Taylor (2007) |
+| Les mots réussis entrent dans les révisions SM-2 de l'élève | Revoir chaque mot juste avant de l'oublier | Leitner (1972) ; Wozniak (1990) |
+| Une capsule culturelle par unité (Yennayer, tajmaɛt, tiwizi, Fadhma Aït Mansour…) | Relier la langue au vécu et à l'identité de l'apprenant | Freire (1970) ; Deci & Ryan (1985) ; Dörnyei (2009) |
+| Après les exercices, le prof IA reprend l'unité en conversation (jeu de rôle conseillé dans `tutor_focus`) | Produire et négocier le sens fait passer de la reconnaissance à l'usage | Swain (1985) ; Long (1996) |
+| Le prof corrige une seule erreur à la fois, par reformulation ou en invitant à se corriger | Le feedback le plus efficace en classe de langue | Lyster & Ranta (1997) |
+| L'unité suivante n'arrive qu'une fois tous les mots de l'unité rencontrés (`current_unit`) | Avancer quand la base est acquise | Bloom (1968) |
+| On félicite l'effort et la stratégie, jamais le « talent » | Entretenir la persévérance | Dweck (2006) |
+
+### Références
+
+- Bjork, R. A. (1994). Memory and metamemory considerations in the training of human beings. In J. Metcalfe & A. Shimamura (dir.), *Metacognition: Knowing about knowing*. MIT Press.
+- Bloom, B. S. (1968). Learning for mastery. *Evaluation Comment*, 1(2).
+- Cepeda, N. J., Pashler, H., Vul, E., Wixted, J. T., & Rohrer, D. (2006). Distributed practice in verbal recall tasks: A review and quantitative synthesis. *Psychological Bulletin*, 132(3), 354–380.
+- Comenius, J. A. (1658). *Orbis sensualium pictus*.
+- Conseil de l'Europe (2001). *Cadre européen commun de référence pour les langues*. Volume complémentaire (2020).
+- Deci, E. L., & Ryan, R. M. (1985). *Intrinsic Motivation and Self-Determination in Human Behavior*. Plenum.
+- Dörnyei, Z. (2009). The L2 Motivational Self System. In Z. Dörnyei & E. Ushioda (dir.), *Motivation, Language Identity and the L2 Self*. Multilingual Matters.
+- Dweck, C. S. (2006). *Mindset: The New Psychology of Success*. Random House.
+- Ebbinghaus, H. (1885). *Über das Gedächtnis*.
+- Ellis, R. (2003). *Task-based Language Learning and Teaching*. Oxford University Press.
+- Freire, P. (1970). *Pedagogia do oprimido* (trad. fr. *Pédagogie des opprimés*, Maspero, 1974).
+- Krashen, S. D. (1982). *Principles and Practice in Second Language Acquisition*. Pergamon.
+- Leitner, S. (1972). *So lernt man lernen*. Herder.
+- Lewis, M. (1993). *The Lexical Approach*. Language Teaching Publications.
+- Long, M. H. (1996). The role of the linguistic environment in second language acquisition. In W. Ritchie & T. Bhatia (dir.), *Handbook of Second Language Acquisition*. Academic Press.
+- Lyster, R., & Ranta, L. (1997). Corrective feedback and learner uptake. *Studies in Second Language Acquisition*, 19(1), 37–66.
+- Nation, I. S. P. (2013). *Learning Vocabulary in Another Language* (2ᵉ éd.). Cambridge University Press.
+- Pimsleur, P. (1967). A memory schedule. *The Modern Language Journal*, 51(2), 73–75.
+- Richland, L. E., Kornell, N., & Kao, L. S. (2009). The pretesting effect: Do unsuccessful retrieval attempts enhance learning? *Journal of Experimental Psychology: Applied*, 15(3), 243–257.
+- Roediger, H. L., & Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. *Psychological Science*, 17(3), 249–255.
+- Rohrer, D., & Taylor, K. (2007). The shuffling of mathematics problems improves learning. *Instructional Science*, 35, 481–498.
+- Swain, M. (1985). Communicative competence: Some roles of comprehensible input and comprehensible output in its development. In S. Gass & C. Madden (dir.), *Input in Second Language Acquisition*. Newbury House.
+- Sweller, J. (1988). Cognitive load during problem solving: Effects on learning. *Cognitive Science*, 12(2), 257–285.
+- Wozniak, P. A. (1990). *Optimization of learning* (algorithme SM-2, SuperMemo). Mémoire de master, Université de technologie de Poznań.
+
+### À faire valider par un linguiste du HCA
+
+Les 65 mots et 34 blocs du programme ont été choisis par Amusnaw et vérifiés dans le corpus des livres HCA, mais doivent être relus avant la remise (orthographe, état d'annexion, formes féminines). Exemple corrigé grâce au corpus : « Amek telliḍ ? » (72 occurrences) et non « Amek tellid ? ».

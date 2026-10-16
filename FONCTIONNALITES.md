@@ -34,6 +34,8 @@ Ce journal est tenu au fil du projet. Il sert de base au PDF de présentation de
 - Capsules culture (Yennayer, Mammeri, Tafsut, Tiwizi, Si Mohand, tabzimt, poterie, Fadhma Aït Mansour…), à lire en entier d'un tap.
 - **Mot du jour** différent chaque jour, avec son écriture en Tifinagh (conversion automatique).
 - **Révisions espacées** (SM-2) mêlées à la séance du jour : les mots sur le point d'être oubliés reviennent en premier.
+- **Programme A1 en 13 unités** (saluer, se présenter, la famille, compter, à table, la maison, le corps, le village, le temps, les verbes, les couleurs, les fêtes), conçu selon la recherche en didactique des langues : 5 mots nouveaux au plus, blocs de langue, reconnaissance puis rappel, révision entrelacée, une capsule culture par unité (références dans `docs/PEDAGOGIE.md`).
+- **Le prof suit le programme** : il reçoit l'unité en cours (objectif, mots, blocs, jeu de rôle conseillé) et passe à la suivante quand l'élève a rencontré tous les mots.
 - **Leçons générées depuis les lexiques HCA** (animaux marins, mots nouveaux…), avec la source affichée.
 - Progression enregistrée sur le téléphone et sur le serveur.
 - Parcours A1 → B2 (Tazwara…), compétences (vocabulaire, compréhension, grammaire, culture).
@@ -66,7 +68,11 @@ Ce journal est tenu au fil du projet. Il sert de base au PDF de présentation de
 ### Pipeline de données (livres → base)
 - Conversion des **anciennes polices kabyles** des livres HCA (Tira, Tayma, Symbol) vers l'Unicode, police par police.
 - **Alignement automatique français ↔ kabyle** des livres traduits (Gale-Church + noms propres et ponctuation, par paragraphes puis par phrases).
-- Corpus actuel : 3 235 paires de phrases (*Le Petit Prince*, *Le fils du pauvre*, *Misère de la Kabylie*), plus de 560 mots, 914 phrases kabyles.
+- Corpus actuel :
+  - **≈ 14 400 mots et termes** (lexiques HCA : vocabulaire moderne, didactique, terre et animaux, animaux marins, juridique, glossaires) + **1 117 prénoms amazighs** avec leur sens ;
+  - **45 700 phrases kabyles authentiques** tirées de 43 livres HCA (romans, contes, poésie, histoire, essais) ;
+  - **3 235 paires de phrases** français ↔ kabyle (*Le Petit Prince*, *Le fils du pauvre*, *Misère de la Kabylie*) ;
+  - fréquence de 97 000 formes kabyles, pour choisir le vocabulaire courant.
 - **Page de relecture** pour linguiste (valider / corriger / rejeter, douteux en premier), avec export pour l'entraînement.
 
 ### Feuille de route de l'IA

@@ -22,7 +22,7 @@ from . import content, learning
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()  # TODO: passer à Alembic pour les migrations
-    kb.load(get_settings().data_dir)
+    kb.load(get_settings().data_dir, get_settings().content_dir)
     with SessionLocal() as db:  # réapplique les décisions du linguiste
         for r in db.scalars(select(Review)):
             kb.apply_review(r.item_id, r.status, r.kab, r.fr)
@@ -154,9 +154,15 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session):
     days_away = (now() - last).days if last else 0
     # Le message + la dernière réponse du prof servent à chercher dans la base
     context = body.message + " " + (history[-1]["content"] if history else "")
+    # Unité du programme : la première dont l'élève n'a pas encore vu tous les mots.
+    seen = set(db.scalars(select(LearnedWord.word_key).where(LearnedWord.user_id == user.id)))
+    plan = content.session_plan(content.current_unit(seen))
+    if not history:
+        plan = ("Premier échange : fais connaissance (niveau, objectifs, vécu), puis propose "
+                "la première activité.\n" + plan)
     system = tutor.build_system_prompt(
         user, profile, days_away=days_away,
-        session_plan="Getting to know the learner: level, goals, background.",
+        session_plan=plan,
         references=kb.references_for(context),
         words_to_reuse=learning.words_to_reuse(db, user.id, tz),
     )

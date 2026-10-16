@@ -13,7 +13,7 @@ from datetime import date
 from pathlib import Path
 
 from .config import get_settings
-from .knowledge import Item, fold, kb
+from .knowledge import DOMAIN_WEIGHT, Item, fold, kb
 
 # ---------- Translittération latin → tifinagh (néo-tifinagh kabyle) ----------
 
@@ -111,8 +111,105 @@ def _auto_lesson(lid: str, title: str, subtitle: str, src: str, cap: str, n: int
             "exercises": [word_exercise(it, pool, rng) for it in chosen]}
 
 
+# ---------- Programme A1 (server/content/curriculum_a1.json) ----------
+# Chaque unité : 5 mots au plus + quelques blocs de langue + une capsule.
+# Les exercices sont générés ici, dans cet ordre (voir docs/PEDAGOGIE.md) :
+#   1. reconnaissance (kabyle → sens)          — prétest + feedback immédiat
+#   2. blocs de langue à compléter (cloze)       — approche lexicale
+#   3. rappel (sens → kabyle), ordre mélangé     — effet de test, difficulté désirable
+#   4. révision de mots des unités précédentes   — répétition espacée, entrelacement
+
+
+def _curriculum() -> dict:
+    path = _content_dir() / "curriculum_a1.json"
+    return json.loads(path.read_text("utf-8")) if path.exists() else {"units": []}
+
+
+def _mcq(eid: str, instruction: str, before: str, answer: str, pool: list[str], rng: random.Random,
+         *, after: str = "", translation: str | None = None, explanation: str = "",
+         tifinagh: str | None = None) -> dict:
+    others = [o for o in dict.fromkeys(pool) if o != answer]
+    rng.shuffle(others)
+    options = [answer, *others[:2]]
+    rng.shuffle(options)
+    return {"id": eid, "instruction": instruction, "before": before, "after": after,
+            "options": options, "answer": answer, "translation": translation,
+            "explanation": explanation, "tifinagh": tifinagh}
+
+
+def curriculum_lessons() -> list[dict]:
+    cur = _curriculum()
+    units = cur.get("units", [])
+    all_words = [w for u in units for w in u["words"]]
+    out = []
+    for idx, u in enumerate(units):
+        rng = random.Random(u["id"])
+        words = u["words"]
+        unit_fr = [w["fr"] for w in words]
+        unit_kab = [w["kab"] for w in words]
+        global_fr = [w["fr"] for w in all_words]
+        ex = []
+        for w in words:  # 1. reconnaissance
+            ex.append(_mcq(f"{u['id']}-r-{w['kab']}", "QUE VEUT DIRE CE MOT ?", w["kab"], w["fr"],
+                           unit_fr + global_fr, rng, explanation=f"{w['kab']} — {w['fr']}.",
+                           tifinagh=to_tifinagh(w["kab"])))
+        blanks = [c["blank"] for c in u.get("chunks", []) if c.get("blank")]
+        for c in u.get("chunks", []):  # 2. blocs de langue
+            b = c.get("blank")
+            if b and b in c["kab"]:
+                before, after = c["kab"].split(b, 1)
+                ex.append(_mcq(f"{u['id']}-c-{b}", "COMPLÈTE", before, b, blanks + unit_kab, rng,
+                               after=after or " ", translation=c["fr"],
+                               explanation=f"{c['kab']} — {c['fr']}"))
+            else:
+                others = [x["fr"] for x in u.get("chunks", []) if x is not c]
+                ex.append(_mcq(f"{u['id']}-m-{len(ex)}", "QUE VEUT DIRE ?", c["kab"], c["fr"],
+                               others + unit_fr, rng, explanation=f"{c['kab']} — {c['fr']}"))
+        recall = list(words)
+        rng.shuffle(recall)
+        for w in recall:  # 3. rappel
+            ex.append(_mcq(f"{u['id']}-p-{w['kab']}", "COMMENT DIT-ON…", f"« {w['fr']} »", w["kab"],
+                           unit_kab, rng, after="", explanation=f"« {w['fr']} » se dit {w['kab']}."))
+        previous = [w for pu in units[:idx] for w in pu["words"]]
+        for w in rng.sample(previous, min(3, len(previous))):  # 4. révision entrelacée
+            ex.append(_mcq(f"{u['id']}-v-{w['kab']}", "RÉVISION", w["kab"], w["fr"],
+                           [x["fr"] for x in previous], rng, explanation=f"{w['kab']} — {w['fr']}.",
+                           tifinagh=to_tifinagh(w["kab"])))
+        for e in ex:
+            if e["instruction"] == "COMMENT DIT-ON…":
+                e["tifinagh"] = None
+        out.append({
+            "id": u["id"], "level": cur.get("level", "A1"), "order": u.get("order", idx + 1),
+            "title": u["title"], "subtitle": u.get("subtitle", ""), "can_do": u.get("can_do", ""),
+            "capsule": u.get("capsule"), "needs_review": True, "exercises": ex,
+            "words": words, "chunks": u.get("chunks", []), "tutor_focus": u.get("tutor_focus", ""),
+        })
+    return out
+
+
+def current_unit(introduced: set[str]) -> dict | None:
+    """Première unité dont l'élève n'a pas encore rencontré tous les mots."""
+    units = curriculum_lessons()
+    for u in units:
+        keys = {fold(w["kab"]) for w in u["words"]}
+        if not keys <= introduced:
+            return u
+    return units[-1] if units else None
+
+
+def session_plan(unit: dict | None) -> str:
+    if not unit:
+        return "Faire connaissance : niveau, objectifs, vécu de l'élève."
+    words = ", ".join(f"{w['kab']} ({w['fr']})" for w in unit["words"])
+    chunks = " ; ".join(f"{c['kab']} = {c['fr']}" for c in unit.get("chunks", []))
+    return (f"Unité « {unit['title']} » ({unit['level']}). Objectif : {unit.get('can_do', '')}\n"
+            f"Mots de l'unité : {words}\nBlocs de langue : {chunks}\n"
+            f"Activité conseillée : {unit.get('tutor_focus', '')}\n"
+            "Ne présente pas plus de 2 ou 3 mots nouveaux par réponse.")
+
+
 def lessons() -> list[dict]:
-    out = [dict(l) for l in _load("lessons.json")]
+    out = curriculum_lessons() or [dict(l) for l in _load("lessons.json")]
     for args in AUTO_LESSONS:
         l = _auto_lesson(*args)
         if l:
@@ -142,8 +239,14 @@ def _day_index(day: date, n: int, salt: str) -> int:
 
 
 def today(day: date) -> dict:
-    words = [it for it in _word_items() if " " not in it.kab.strip()] or _word_items()
-    w = words[_day_index(day, len(words), "word")] if words else None
+    # Mot du jour : un mot du programme A1 (vocabulaire courant), sinon du lexique général.
+    prog = [w for u in _curriculum().get("units", []) for w in u["words"]]
+    if prog:
+        pw = prog[_day_index(day, len(prog), "word")]
+        w = Item(id="prog", kind="word", kab=pw["kab"], fr=pw["fr"], source="Programme Amusnaw A1")
+    else:
+        words = [it for it in _word_items() if " " not in it.kab.strip()] or _word_items()
+        w = words[_day_index(day, len(words), "word")] if words else None
     caps = capsules()
     c = caps[_day_index(day, len(caps), "capsule")] if caps else None
     ls = lessons()
@@ -171,14 +274,24 @@ def strip_markers(reply: str) -> tuple[str, list[tuple[str, str]]]:
     return text, found
 
 
+def _rank(it: Item) -> tuple:
+    return (it.status in ("ok", "fixed"), DOMAIN_WEIGHT.get(it.domain, 1.0))
+
+
 def _find_word(term: str) -> Item | None:
-    key = fold(term)
-    best = None
-    for it in kb.items.values():
-        if it.kind == "word" and it.status != "rejected" and fold(it.kab).split(" (")[0] == key:
-            if best is None or it.status in ("ok", "fixed"):
-                best = it
-    return best
+    key = fold(term).strip(" !?.")
+    found = [it for it in kb.items.values()
+             if it.kind == "word" and it.status != "rejected" and fold(it.kab).split(" (")[0].strip(" !?.") == key]
+    return max(found, key=_rank) if found else None
+
+
+# Vocabulaire courant pour les exercices du chat (pas de termes juridiques
+# ni de néologismes savants).
+EVERYDAY = ("programme", "général", "animaux marins", "animaux", "sciences de la terre")
+
+
+def _everyday_items() -> list[Item]:
+    return [it for it in _word_items() if it.domain in EVERYDAY and " " not in it.kab.strip()]
 
 
 def build_blocks(reply: str, markers: list[tuple[str, str]], seed: str) -> list[dict]:
@@ -192,9 +305,11 @@ def build_blocks(reply: str, markers: list[tuple[str, str]], seed: str) -> list[
                                "tifinagh": to_tifinagh(it.kab), "source": it.source})
         elif kind in ("EXERCICE", "EXERCISE"):
             # Mot de la réponse présent dans le lexique, sinon un mot au hasard
-            pool = _word_items()
-            mentioned = [it for k in kb.kabyle_words(reply) if (it := _find_word(k))]
-            target = mentioned[0] if mentioned else (rng.choice(pool) if pool else None)
+            pool = _everyday_items()
+            prog = [it for it in pool if it.domain == "programme"] or pool
+            mentioned = [it for k in kb.kabyle_words(reply) if (it := _find_word(k)) and it.domain in EVERYDAY]
+            target = mentioned[0] if mentioned else (rng.choice(prog) if prog else None)
+            pool = [it for it in pool if it.domain == target.domain] if target else pool
             if target and len(pool) >= 3:
                 blocks.append({"type": "exercise", **word_exercise(target, pool, rng)})
         elif kind == "CAPSULE":

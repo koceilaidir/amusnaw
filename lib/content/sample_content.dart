@@ -124,10 +124,10 @@ const firstWords = Lesson(
       instruction: 'COMPLÈTE LA SALUTATION',
       before: 'Azul! Amek ',
       after: '?',
-      options: ['tellid', 'aman', 'adrar'],
-      answer: 'tellid',
+      options: ['telliḍ', 'aman', 'adrar'],
+      answer: 'telliḍ',
       translation: 'Bonjour ! Comment vas-tu ?',
-      explanation: 'Amek tellid ? — comment vas-tu ? C’est la question qu’on pose juste après Azul.',
+      explanation: 'Amek telliḍ ? — comment vas-tu ? C’est la question qu’on pose juste après Azul.',
     ),
     ChoiceExercise(
       id: 'aman',
