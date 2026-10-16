@@ -39,7 +39,7 @@ String learnedMessage(String lang, List<String> words, int total) {
 }
 
 /// Écran principal : l'app s'ouvre toujours ici, sur le chat avec le prof.
-/// Menu en haut à gauche (tiroir), apparence en haut à droite.
+/// Menu en haut à gauche (tiroir), apparence (clair/sombre) en haut à droite.
 class TutorChatScreen extends StatefulWidget {
   const TutorChatScreen({super.key});
 
@@ -697,7 +697,7 @@ class _Composer extends StatelessWidget {
                   decoration: InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
-                    hintText: 'Écris en kabyle ou en français…',
+                    hintText: 'Écris ton message…',
                     hintStyle: TextStyle(color: p.text2, fontSize: 16),
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
@@ -823,39 +823,6 @@ class _ThemeMenu extends StatelessWidget {
               mode(ThemeMode.system, 'Automatique'),
               mode(ThemeMode.light, 'Clair'),
               mode(ThemeMode.dark, 'Sombre'),
-              Container(height: .5, margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), color: p.separator),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 4, 10, 2),
-                child: Text('Couleur', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: p.text2)),
-              ),
-              Row(children: [
-                for (final a in accentChoices)
-                  Semantics(
-                    label: a.label,
-                    button: true,
-                    selected: s.accent == a.id,
-                    child: GestureDetector(
-                      onTap: () => appSettings.setAccent(a.id),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        alignment: Alignment.center,
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: p.isDark ? a.dark : a.light,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              if (s.accent == a.id) BoxShadow(color: p.text, spreadRadius: 4),
-                              BoxShadow(color: p.panel, spreadRadius: 2),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ]),
             ]),
           ),
         );

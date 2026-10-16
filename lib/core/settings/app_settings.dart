@@ -7,7 +7,7 @@ class AppSettingsState {
     this.themeMode = ThemeMode.system,
     this.reminderOn = false,
     this.reminderTime = const TimeOfDay(hour: 19, minute: 0),
-    this.accent = 'terracotta',
+    this.accent = 'olivier',
   });
 
   /// Couleur d'accent choisie dans le menu Thème (id de accentChoices).
@@ -45,7 +45,7 @@ class AppSettings extends ValueNotifier<AppSettingsState> {
         hour: prefs.getInt('reminder_hour') ?? 19,
         minute: prefs.getInt('reminder_minute') ?? 0,
       ),
-      accent: prefs.getString('accent') ?? 'terracotta',
+      accent: prefs.getString('accent') ?? 'olivier',
     );
   }
 

@@ -124,7 +124,9 @@ class LearnerStore extends ValueNotifier<LearnerState> {
   }
 
   void setName(String? name) {
-    if (name != null && name.isNotEmpty) value = value.copyWith(name: name.split(' ').first);
+    if (name == null || name.trim().isEmpty) return;
+    final first = name.trim().split(' ').first;
+    value = value.copyWith(name: first[0].toUpperCase() + first.substring(1));
   }
 
   /// Enregistre une réponse : met à jour la carte mémoire (SM-2) et la

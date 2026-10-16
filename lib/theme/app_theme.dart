@@ -8,14 +8,9 @@ class AccentChoice {
   final Color light, lightText, lightSoft, dark, darkSoft;
 }
 
+/// Couleur principale : le vert olivier (seule couleur de l'app).
 const accentChoices = <AccentChoice>[
-  AccentChoice('terracotta', 'Terre cuite', Color(0xFFAD5A2A), Color(0xFF9A4F24), Color(0xFFF5E4D7),
-      Color(0xFFE39A68), Color(0xFF3A281C)),
-  AccentChoice('ocre', 'Ocre', Color(0xFF9A7020), Color(0xFF835D1A), Color(0xFFF3E9D0), Color(0xFFD9B158),
-      Color(0xFF352B17)),
-  AccentChoice('indigo', 'Indigo', Color(0xFF2F54C8), Color(0xFF2F54C8), Color(0xFFE2E8FA), Color(0xFF8EA4F2),
-      Color(0xFF1E2742)),
-  AccentChoice('olivier', 'Olivier', Color(0xFF56662E), Color(0xFF56662E), Color(0xFFE7ECD9), Color(0xFFA9BD72),
+  AccentChoice('olivier', 'Olivier', Color(0xFF56662E), Color(0xFF4E5C29), Color(0xFFE7ECD9), Color(0xFFA9BD72),
       Color(0xFF283020)),
 ];
 

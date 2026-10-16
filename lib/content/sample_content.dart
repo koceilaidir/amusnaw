@@ -17,7 +17,7 @@ class ChoiceExercise {
 
   factory ChoiceExercise.fromJson(Map<String, dynamic> j) => ChoiceExercise(
         id: j['id'] as String,
-        instruction: (j['instruction'] as String?) ?? 'WHAT DOES IT MEAN?',
+        instruction: (j['instruction'] as String?) ?? 'QUE VEUT DIRE CE MOT ?',
         before: j['before'] as String,
         after: (j['after'] as String?) ?? '',
         options: (j['options'] as List).cast<String>(),
@@ -109,57 +109,57 @@ class LessonSummary {
 const yennayer = CultureCapsule(
   kab: 'Aseggas ameggaz!',
   title: 'Yennayer',
-  body: '“Happy new year!” — wished on Yennayer, 12 January, when the Amazigh '
-      'calendar turns. Families share a festive meal to bless the year ahead.',
+  body: '« Bonne année ! » — le 12 janvier, on fête Yennayer, le nouvel an amazigh. '
+      'Les familles partagent un repas de fête pour bénir l’année qui commence.',
 );
 
 const firstWords = Lesson(
   id: 'a1-first-words',
-  title: "At grandmother's table",
-  subtitle: 'Greetings, water and bread',
+  title: 'À la table de grand-mère',
+  subtitle: 'Saluer, l’eau et le pain',
   capsule: yennayer,
   exercises: [
     ChoiceExercise(
       id: 'amek-tellid',
-      instruction: 'COMPLETE THE GREETING',
+      instruction: 'COMPLÈTE LA SALUTATION',
       before: 'Azul! Amek ',
       after: '?',
       options: ['tellid', 'aman', 'adrar'],
       answer: 'tellid',
-      translation: 'Hello! How are you? (to a man)',
-      explanation: "Kabyle changes the verb for who you speak to. To a woman, you'd say Amek tellam?",
+      translation: 'Bonjour ! Comment vas-tu ?',
+      explanation: 'Amek tellid ? — comment vas-tu ? C’est la question qu’on pose juste après Azul.',
     ),
     ChoiceExercise(
       id: 'aman',
-      instruction: 'WHAT DOES IT MEAN?',
+      instruction: 'QUE VEUT DIRE CE MOT ?',
       before: 'aman',
-      options: ['water', 'bread', 'house'],
-      answer: 'water',
-      explanation: 'Aman is water — one of the first words children hear at the table.',
+      options: ['l’eau', 'le pain', 'la maison'],
+      answer: 'l’eau',
+      explanation: 'Aman, c’est l’eau — un des premiers mots qu’on entend à table.',
     ),
     ChoiceExercise(
       id: 'aghrum',
-      instruction: 'WHAT DOES IT MEAN?',
+      instruction: 'QUE VEUT DIRE CE MOT ?',
       before: 'aɣrum',
-      options: ['mountain', 'bread', 'water'],
-      answer: 'bread',
-      explanation: 'Aɣrum is bread. The letter ɣ sounds like a French r, from the throat.',
+      options: ['la montagne', 'le pain', 'l’eau'],
+      answer: 'le pain',
+      explanation: 'Aɣrum, c’est le pain. Le ɣ se prononce au fond de la gorge, comme un r français.',
     ),
     ChoiceExercise(
       id: 'tanemmirt',
-      instruction: 'WHAT DOES IT MEAN?',
+      instruction: 'QUE VEUT DIRE CE MOT ?',
       before: 'Tanemmirt',
-      options: ['Goodbye', 'Thank you', 'Hello'],
-      answer: 'Thank you',
-      explanation: 'Tanemmirt — thank you. Use it generously, it opens every door.',
+      options: ['au revoir', 'merci', 'bonjour'],
+      answer: 'merci',
+      explanation: 'Tanemmirt — merci. À utiliser sans compter.',
     ),
     ChoiceExercise(
       id: 'axxam',
-      instruction: 'WHAT DOES IT MEAN?',
+      instruction: 'QUE VEUT DIRE CE MOT ?',
       before: 'axxam',
-      options: ['house', 'friend', 'sun'],
-      answer: 'house',
-      explanation: 'Axxam is the house — and the family who lives in it.',
+      options: ['la maison', 'l’ami', 'le soleil'],
+      answer: 'la maison',
+      explanation: 'Axxam, c’est la maison — et aussi la famille qui y vit.',
     ),
   ],
 );
@@ -167,9 +167,9 @@ const firstWords = Lesson(
 /// Parcours A1 affiché dans l'onglet Learn.
 const a1Lessons = [
   firstWords,
-  Lesson(id: 'a1-family', title: 'The family', subtitle: 'Yemma, baba and the others', exercises: []),
-  Lesson(id: 'a1-numbers', title: 'Numbers', subtitle: 'Counting at the market', exercises: []),
-  Lesson(id: 'a1-village', title: 'The village', subtitle: 'Axxam, tajmaɛt, the fountain', exercises: []),
+  Lesson(id: 'a1-family', title: 'La famille', subtitle: 'Yemma, baba et les autres', exercises: []),
+  Lesson(id: 'a1-numbers', title: 'Les nombres', subtitle: 'Compter au marché', exercises: []),
+  Lesson(id: 'a1-village', title: 'Le village', subtitle: 'Axxam, tajmaɛt, la fontaine', exercises: []),
 ];
 
 class WordOfTheDay {
@@ -183,4 +183,4 @@ class WordOfTheDay {
       );
 }
 
-const wordOfTheDay = WordOfTheDay('adrar', 'ⴰⴷⵔⴰⵔ', 'mountain');
+const wordOfTheDay = WordOfTheDay('adrar', 'ⴰⴷⵔⴰⵔ', 'la montagne');

@@ -15,8 +15,8 @@ class TodayContent {
     word: wordOfTheDay,
     capsule: yennayer,
     lessonId: 'a1-first-words',
-    lessonTitle: "At grandmother's table",
-    lessonSubtitle: 'Greetings, water and bread',
+    lessonTitle: 'À la table de grand-mère',
+    lessonSubtitle: 'Saluer, l’eau et le pain',
   );
 }
 

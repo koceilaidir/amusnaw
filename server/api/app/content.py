@@ -84,7 +84,7 @@ def word_exercise(item: Item, pool: list[Item], rng: random.Random) -> dict:
     options = [answer, *others[:2]]
     rng.shuffle(options)
     return {
-        "id": f"w-{item.id}", "instruction": "WHAT DOES IT MEAN?",
+        "id": f"w-{item.id}", "instruction": "QUE VEUT DIRE CE MOT ?",
         "before": item.kab, "after": "", "options": options, "answer": answer,
         "translation": None,
         "explanation": f"{item.kab} — {answer}.",
@@ -95,8 +95,8 @@ def word_exercise(item: Item, pool: list[Item], rng: random.Random) -> dict:
 
 AUTO_LESSONS = [
     # id, titre, sous-titre, domaine du lexique, capsule
-    ("hca-sea", "Creatures of the sea", "From the HCA marine lexicon", "animaux marins", "poterie"),
-    ("hca-new-words", "Modern words", "From HCA glossaries", "général", "officielle"),
+    ("hca-sea", "Les animaux de la mer", "D'après le lexique marin du HCA", "animaux marins", "poterie"),
+    ("hca-new-words", "Les mots d'aujourd'hui", "D'après les glossaires du HCA", "général", "officielle"),
 ]
 
 
