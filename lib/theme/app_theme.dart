@@ -165,8 +165,8 @@ class AppTheme {
       cupertinoOverrideTheme: CupertinoThemeDataFont.of(p, b),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: p.ink,
-          foregroundColor: p.onInk,
+          backgroundColor: p.accent,
+          foregroundColor: p.onAccent,
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
           textStyle: const TextStyle(fontFamily: font, fontSize: 17, fontWeight: FontWeight.w600),

@@ -52,6 +52,8 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 
   final _scaffold = GlobalKey<ScaffoldState>();
   final _input = TextEditingController();
+  // Le clavier ne s'ouvre que si l'élève touche le champ de saisie.
+  final _inputFocus = FocusNode();
   final _scroll = ScrollController();
   late Conversation _conv = _blank();
   late Future<TodayContent> _today = contentRepository.today();
@@ -70,12 +72,14 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   void initState() {
     super.initState();
     _input.addListener(() => setState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _dropFocus());
     _syncProgress();
   }
 
   @override
   void dispose() {
     _input.dispose();
+    _inputFocus.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -100,7 +104,10 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     });
   }
 
-  void _openConversation(Conversation c) => setState(() => _conv = c);
+  void _openConversation(Conversation c) {
+    setState(() => _conv = c);
+    _dropFocus();
+  }
 
   Future<void> _send(String raw, {String? intent}) async {
     final text = raw.trim();
@@ -194,10 +201,19 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 
   // ---------- Navigation (menu, raccourcis) ----------
 
-  void _push(Widget screen) {
-    Navigator.of(context, rootNavigator: true).push(CupertinoPageRoute(
+  /// Ferme le clavier, maintenant et après le retour d'un autre écran
+  /// (Flutter redonne sinon le focus au champ de saisie).
+  void _dropFocus() {
+    _inputFocus.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  Future<void> _push(Widget screen) async {
+    _dropFocus();
+    await Navigator.of(context, rootNavigator: true).push(CupertinoPageRoute(
       builder: (ctx) => Material(color: AppPalette.of(ctx).bg, child: screen),
     ));
+    if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) => _dropFocus());
   }
 
   Future<void> _wordOfDay() async {
@@ -207,6 +223,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   }
 
   void _review() {
+    _dropFocus();
     final ex = reviewExercises(learnerStore.value.cards.values.toList());
     if (ex.isEmpty) {
       showCupertinoDialog<void>(
@@ -292,6 +309,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       key: _scaffold,
       backgroundColor: p.bg,
       drawerScrimColor: const Color(0x52141210),
+      onDrawerChanged: (_) => WidgetsBinding.instance.addPostFrameCallback((_) => _dropFocus()),
       drawer: _AppDrawer(
         current: _conv.id,
         onNewChat: _newChat,
@@ -319,7 +337,10 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                     RoundIconButton(
                       label: 'Menu',
                       icon: MenuGlyph(color: p.text),
-                      onPressed: () => _scaffold.currentState?.openDrawer(),
+                      onPressed: () {
+                        _dropFocus();
+                        _scaffold.currentState?.openDrawer();
+                      },
                     ),
                     Row(mainAxisSize: MainAxisSize.min, children: [
                       AmusnawMark(size: 26, color: p.text),
@@ -360,6 +381,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                 onSend: () => _send(_input.text),
                 onTopic: (t) => _send(t, intent: 'talk'),
                 onPlus: _quickActions,
+                focusNode: _inputFocus,
               ),
             ],
           ),
@@ -653,8 +675,10 @@ class _Composer extends StatelessWidget {
     required this.onSend,
     required this.onTopic,
     required this.onPlus,
+    required this.focusNode,
   });
   final TextEditingController controller;
+  final FocusNode focusNode;
   final bool sending;
   final List<String> topics;
   final VoidCallback onSend, onPlus;
@@ -688,6 +712,8 @@ class _Composer extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 2),
                 child: TextField(
                   controller: controller,
+                  focusNode: focusNode,
+                  autofocus: false,
                   minLines: 1,
                   maxLines: 5,
                   textInputAction: TextInputAction.send,
@@ -707,11 +733,11 @@ class _Composer extends StatelessWidget {
             const SizedBox(width: 10),
             _Circle(
               label: 'Envoyer',
-              color: ready ? p.ink : p.fill,
+              color: ready ? p.accent : p.fill,
               onTap: ready ? onSend : null,
               child: sending
                   ? CupertinoActivityIndicator(radius: 8, color: p.text2)
-                  : Icon(CupertinoIcons.arrow_up, size: 20, color: ready ? p.onInk : p.text2),
+                  : Icon(CupertinoIcons.arrow_up, size: 20, color: ready ? p.onAccent : p.text2),
             ),
           ]),
         ),

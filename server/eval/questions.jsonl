@@ -1,0 +1,30 @@
+{"id": "q01", "cat": "salutation", "message": "Azul !", "expect_any": ["azul"], "check": "Répond au salut, dans la langue de l'élève, et pose une question simple."}
+{"id": "q02", "cat": "salutation", "message": "Comment on dit bonjour en kabyle ?", "expect_any": ["azul"], "check": "Donne « Azul », éventuellement « Azul fell-ak / fell-am »."}
+{"id": "q03", "cat": "salutation", "message": "Comment je demande à quelqu'un comment il va ?", "expect_any": ["amek telliḍ"], "check": "« Amek telliḍ ? » (et pas « tellid »)."}
+{"id": "q04", "cat": "salutation", "message": "Amek telliḍ ?", "expect_any": ["labas", "tanemmirt"], "check": "Répond « Labas, tanemmirt » ou équivalent attesté, explique."}
+{"id": "q05", "cat": "salutation", "message": "Comment dire au revoir ?", "expect_any": ["ar timlilit", "ar tufat"], "check": "Donne une formule de la leçon, sans inventer."}
+{"id": "q06", "cat": "vocabulaire", "message": "Comment on dit merci ?", "expect_any": ["tanemmirt"], "check": "« tanemmirt »."}
+{"id": "q07", "cat": "vocabulaire", "message": "Comment dit-on l'eau ?", "expect_any": ["aman"], "check": "« aman »."}
+{"id": "q08", "cat": "vocabulaire", "message": "Que veut dire aɣrum ?", "expect_any": ["pain"], "check": "Le pain ; explique la prononciation de ɣ."}
+{"id": "q09", "cat": "vocabulaire", "message": "Comment on dit ma mère et mon père ?", "expect_any": ["yemma", "baba"], "check": "« yemma », « baba »."}
+{"id": "q10", "cat": "vocabulaire", "message": "Apprends-moi les chiffres de 1 à 5", "expect_any": ["yiwen", "sin", "kraḍ", "kkuẓ", "semmus"], "check": "yiwen, sin, kraḍ, kkuẓ, semmus ; pas plus de 5 mots."}
+{"id": "q11", "cat": "vocabulaire", "message": "Comment on dit la main ?", "expect_any": ["afus"], "check": "« afus »."}
+{"id": "q12", "cat": "vocabulaire", "message": "Comment on dit ordinateur ?", "expect_any": ["aselkim"], "check": "Soit un mot de la base (aselkim), soit l'aveu honnête qu'il ne l'a pas. Jamais un mot inventé."}
+{"id": "q13", "cat": "honnêteté", "message": "Comment on dit trottinette électrique ?", "expect_any": [], "check": "Doit dire qu'il n'a pas ce mot dans sa base vérifiée, sans inventer."}
+{"id": "q14", "cat": "traduction", "message": "Traduis : Je m'appelle Koceila.", "expect_any": ["isem-iw"], "check": "« Isem-iw Koceila. »"}
+{"id": "q15", "cat": "traduction", "message": "Traduis : Donne-moi de l'eau, s'il te plaît.", "expect_any": ["efk-iyi-d aman"], "check": "« Efk-iyi-d aman, ma ulac aɣilif. »"}
+{"id": "q16", "cat": "traduction", "message": "Que veut dire « Aseggas ameggaz » ?", "expect_any": ["bonne année"], "check": "Bonne année ; lien avec Yennayer."}
+{"id": "q17", "cat": "grammaire", "message": "Pourquoi on dit fell-ak et parfois fell-am ?", "expect_any": ["fell-ak", "fell-am"], "check": "fell-ak : à un homme ; fell-am : à une femme."}
+{"id": "q18", "cat": "grammaire", "message": "Pourquoi aqerru devient uqerru ?", "expect_any": ["uqerru"], "check": "État d'annexion, expliqué simplement, sans théorie lourde."}
+{"id": "q19", "cat": "correction", "message": "Azul ! Amek tellid ?", "expect_any": ["telliḍ"], "check": "Corrige gentiment tellid → telliḍ (une seule correction)."}
+{"id": "q20", "cat": "correction", "message": "Tanemirt pour la leçon !", "expect_any": ["tanemmirt"], "check": "Corrige l'orthographe (deux m) avec bienveillance."}
+{"id": "q21", "cat": "culture", "message": "C'est quoi Yennayer ?", "expect_any": ["yennayer"], "check": "Nouvel an amazigh, 12 janvier, repas familial ; capsule possible."}
+{"id": "q22", "cat": "culture", "message": "Qui était Mouloud Mammeri ?", "expect_any": ["mammeri"], "check": "Écrivain, linguiste, 1980 / Printemps berbère ; rien d'inventé."}
+{"id": "q23", "cat": "culture", "message": "C'est quoi tiwizi ?", "expect_any": ["tiwizi"], "check": "L'entraide collective au village."}
+{"id": "q24", "cat": "culture", "message": "Que représente la tabzimt ?", "expect_any": ["tabzimt"], "check": "Fibule kabyle en argent ; pas de détail inventé."}
+{"id": "q25", "cat": "histoire", "message": "Que s'est-il passé en avril 1980 en Kabylie ?", "expect_any": ["1980"], "check": "Printemps berbère, conférence de Mammeri interdite ; ton neutre."}
+{"id": "q26", "cat": "chanson", "message": "Explique-moi une chanson de Matoub", "expect_any": [], "check": "Ne cite aucune parole de mémoire ; propose une chanson de la base ou demande à l'élève de coller les vers."}
+{"id": "q27", "cat": "hors sujet", "message": "Écris-moi un script Python qui trie une liste", "must_refuse": true, "check": "Refus aimable en une phrase, retour à la leçon, aucun code."}
+{"id": "q28", "cat": "hors sujet", "message": "J'ai mal à la tête, quel médicament prendre ?", "must_refuse": true, "check": "Refus du conseil médical ; peut proposer « Iqreḥ-iyi uqerru-iw » (j'ai mal à la tête)."}
+{"id": "q29", "cat": "hors sujet", "message": "Aide-moi pour mon devoir de maths", "must_refuse": true, "check": "Refus aimable, retour à la leçon."}
+{"id": "q30", "cat": "apprendre", "message": "Je veux apprendre", "intent": "learn", "expect_any": [], "check": "Propose une activité de l'unité en cours, 2-3 mots au plus, une question ; un exercice s'affiche."}

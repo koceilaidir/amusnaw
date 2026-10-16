@@ -322,3 +322,31 @@ def build_blocks(reply: str, markers: list[tuple[str, str]], seed: str) -> list[
             if c:
                 blocks.append({"type": "capsule", **c})
     return blocks
+
+
+# ---------- Contrôle du kabyle cité par le prof ----------
+
+_QUOTED = re.compile(r"«\s*([^»]{1,80}?)\s*»|\*\*([^*]{1,80}?)\*\*")
+
+
+def unverified_kabyle(reply: str, context: str) -> list[str]:
+    """Segments kabyles cités par le prof (« … » ou **…**) qui ne figurent ni
+    dans le contexte fourni (références, leçon) ni dans le vocabulaire attesté.
+    Sert au contrôle qualité et à la relecture, pas à bloquer la réponse."""
+    ctx = fold(context)
+    out = []
+    for m in _QUOTED.finditer(reply):
+        seg = (m.group(1) or m.group(2)).strip(" .,!?;:")
+        if not seg or not re.search(r"[a-zA-Zɣɛḍṭẓṛṣḥčǧ]", seg):
+            continue
+        key = fold(seg)
+        if key in ctx:
+            continue
+        words = [fold(w) for w in re.findall(r"[^\W\d_]+", seg)]
+        # Une citation en français (traduction) n'est pas du kabyle : on l'ignore.
+        if all(w in kb.kab_vocab for w in words if len(w) >= 3):
+            continue
+        if not any(re.search(r"[ɣɛḍṭẓṛṣḥčǧ]", w) or w in kb.kab_vocab for w in re.findall(r"[^\W\d_]+", seg.lower())):
+            continue  # aucun indice de kabyle : probablement du français
+        out.append(seg)
+    return out

@@ -171,7 +171,8 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session):
 
 
 def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
-                 off_topic: bool, newly_learned: list[str], intent: str | None = None) -> dict:
+                 off_topic: bool, newly_learned: list[str], intent: str | None = None,
+                 system: str = "") -> dict:
     """Ce qui suit la réponse : blocs, mots découverts, historique, total."""
     model = None if off_topic else get_settings().llm_model
     reply, markers = content.strip_markers(reply)
@@ -188,7 +189,12 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
     profile.last_session_at = now()
     db.merge(profile)
     db.commit()
+    # Contrôle qualité : kabyle cité par le prof mais absent des références.
+    unverified = [] if off_topic else content.unverified_kabyle(reply, system)
+    if unverified:
+        print(f"[tutor] kabyle non vérifié ({user.id}): {unverified}", flush=True)
     return {
+        "unverified": unverified,
         "reply": reply,
         "off_topic": off_topic,
         "learned": {"new": newly_learned, "total": learning.total_learned(db, user.id)},
@@ -206,7 +212,7 @@ async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = D
         reply = await tutor.ask_model(system, history, body.message)
     except Exception as e:  # modèle indisponible
         raise HTTPException(503, "Tutor is unavailable, try again shortly.") from e
-    return _finish_turn(db, user, profile, body.message, reply, False, newly, body.intent)
+    return _finish_turn(db, user, profile, body.message, reply, False, newly, body.intent, system)
 
 
 @app.post("/tutor/chat/stream")
@@ -244,7 +250,7 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
             yield event({"type": "error", "message": "Tutor is unavailable, try again shortly."})
             return
         reply = "".join(parts).strip()
-        yield event({"type": "done", **_finish_turn(db, user, profile, body.message, reply, False, newly, body.intent)})
+        yield event({"type": "done", **_finish_turn(db, user, profile, body.message, reply, False, newly, body.intent, system)})
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
