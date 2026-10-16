@@ -5,7 +5,7 @@ import '../../content/sample_content.dart';
 import '../../core/api/api_client.dart';
 import '../../core/learning/learner_store.dart';
 import '../../theme/app_theme.dart';
-import '../../theme/filigree.dart';
+import '../../theme/mark.dart';
 import '../../widgets/common.dart';
 
 /// Écran 4 : une séance d'exercices, une question à la fois, retour
@@ -74,9 +74,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
         body: SafeArea(
           child: Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text('This lesson is coming soon.', style: TextStyle(fontSize: 17, color: p.text2)),
+              Text('Cette leçon arrive bientôt.', style: TextStyle(fontSize: 17, color: p.text2)),
               const SizedBox(height: 16),
-              CupertinoButton(child: const Text('Close'), onPressed: () => Navigator.of(context).pop(false)),
+              CupertinoButton(child: const Text('Fermer'), onPressed: () => Navigator.of(context).pop(false)),
             ]),
           ),
         ),
@@ -93,7 +93,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             children: [
               Row(children: [
                 Semantics(
-                  label: 'Close',
+                  label: 'Fermer',
                   button: true,
                   child: CupertinoButton(
                     padding: EdgeInsets.zero,
@@ -120,13 +120,13 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text('${_showCapsule ? _items.length : _index + 1} of ${_items.length}',
+                Text('${_showCapsule ? _items.length : _index + 1} sur ${_items.length}',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.text2)),
               ]),
               const SizedBox(height: 28),
               Expanded(child: _showCapsule ? _capsule(p) : _question(p)),
               PrimaryButton(
-                label: _showCapsule ? 'Finish' : 'Continue',
+                label: _showCapsule ? 'Terminer' : 'Continuer',
                 onPressed: _showCapsule || _correct ? _next : null,
               ),
             ],
@@ -212,7 +212,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                   Icon(_correct ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.arrow_counterclockwise_circle_fill,
                       color: _correct ? p.green : p.gold, size: 22),
                   const SizedBox(width: 8),
-                  Text(_correct ? "That's it." : 'Not quite — try another one.',
+                  Text(_correct ? 'C’est ça.' : 'Pas tout à fait — essaie une autre réponse.',
                       style: TextStyle(
                           fontSize: 17, fontWeight: FontWeight.w600, color: _correct ? p.green : p.gold)),
                 ]),
@@ -259,12 +259,12 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
                   ],
                 ),
               ),
-              Positioned(right: -56, top: -56, child: Rosette(size: 170, opacity: .28, color: p.gold)),
+              Positioned(right: 18, top: 18, child: AmusnawMark(size: 26, color: p.gold)),
             ],
           ),
         ),
         const SizedBox(height: 24),
-        Text('Lesson complete. Tanemmirt!',
+        Text('Leçon terminée. Tanemmirt !',
             style: TextStyle(fontSize: 17, color: p.text2)),
       ],
     );

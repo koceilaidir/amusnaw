@@ -7,8 +7,7 @@ import '../../core/config.dart';
 import '../../core/learning/learner_store.dart';
 import '../../core/locale/locale_controller.dart';
 import '../../theme/app_theme.dart';
-import '../../theme/filigree.dart';
-import '../home/home_shell.dart';
+import '../../theme/mark.dart';
 import '../tutor/tutor_chat_screen.dart';
 
 /// Écran 1 : « Azul. », langue détectée + bouton Changer, connexion rapide.
@@ -35,7 +34,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     } on AuthException catch (e) {
       _toast(e.message);
     } catch (_) {
-      _toast('Server unreachable. Check API_BASE_URL and that the server is running.');
+      _toast('Serveur injoignable. Vérifie ta connexion et réessaie.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -54,17 +53,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final name = await showCupertinoDialog<String>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Test without an account'),
+        title: const Text('Tester sans compte'),
         content: Padding(
           padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(controller: ctrl, placeholder: 'Your first name', autofocus: true),
+          child: CupertinoTextField(controller: ctrl, placeholder: 'Ton prénom', autofocus: true),
         ),
         actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          CupertinoDialogAction(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
           CupertinoDialogAction(
             isDefaultAction: true,
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Continue'),
+            child: const Text('Continuer'),
           ),
         ],
       ),
@@ -76,12 +75,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   /// Écran 2 (le prof fait connaissance), puis l'app avec ses onglets.
   void _startOnboarding() {
     Navigator.of(context).pushReplacement(CupertinoPageRoute(
-      builder: (ctx) => TutorChatScreen(
-        onboarding: true,
-        onDone: () => Navigator.of(ctx).pushReplacement(
-          CupertinoPageRoute(builder: (_) => const HomeShell()),
-        ),
-      ),
+      builder: (_) => const TutorChatScreen(),
     ));
   }
 
@@ -89,10 +83,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     return Scaffold(
-      body: Stack(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [p.bgTop, p.bg],
+            stops: const [0, .45],
+          ),
+        ),
+        child: Stack(
         children: [
-          const Positioned(
-              top: -70, right: -120, child: Rosette(size: 360, opacity: .14)),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
@@ -102,27 +103,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Container(
-                      width: 60,
-                      height: 60,
+                      width: 64,
+                      height: 64,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: p.accent,
-                        borderRadius: BorderRadius.circular(15),
+                        color: p.ink,
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Text('ⵣ',
-                          style: AppTheme.tifinagh(size: 32, color: p.onAccent)),
+                      child: AmusnawMark(size: 48, color: p.onInk),
                     ),
                   ),
                   const SizedBox(height: 56),
-                  Text('Azul.', style: AppTheme.serif(size: 76, color: p.text)),
+                  Text('Azul.', style: AppTheme.serif(size: 72, color: p.text)),
                   const SizedBox(height: 12),
-                  Text("I'm Amusnaw, your Kabyle tutor.",
+                  Text('Je suis Amusnaw, ton prof de kabyle.',
                       style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w600,
                           color: p.text)),
                   const SizedBox(height: 8),
-                  Text('Language, culture and history — one small step a day.',
+                  Text('La langue, la culture et l’histoire — un petit pas par jour.',
                       style: TextStyle(fontSize: 17, color: p.text2, height: 1.45)),
                   const SizedBox(height: 28),
                   const _DetectedLanguageCard(),
@@ -135,26 +135,27 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         backgroundColor: p.text,
                         foregroundColor: p.bg,
                       ),
-                      child: const Text('Continue with Apple'),
+                      child: const Text('Continuer avec Apple'),
                     ),
                     const SizedBox(height: 12),
                   ],
                   OutlinedButton(
                     onPressed:
                         _busy ? null : () => _signIn(authService.signInWithGoogle),
-                    child: const Text('Continue with Google'),
+                    child: const Text('Continuer avec Google'),
                   ),
                   CupertinoButton(
                     // TODO: connexion e-mail. En bêta : test sans compte.
                     onPressed: _busy ? null : (_testMode ? _testLogin : null),
-                    child: Text(_testMode ? 'Test without an account' : 'Use email instead',
-                        style: TextStyle(color: p.accent, fontSize: 17)),
+                    child: Text(_testMode ? 'Tester sans compte' : 'Utiliser un e-mail',
+                        style: TextStyle(color: p.accentText, fontSize: 17)),
                   ),
                 ],
               ),
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -172,7 +173,9 @@ class _DetectedLanguageCard extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
         decoration: BoxDecoration(
           color: p.surface,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: p.separator, width: .5),
+          boxShadow: p.shadow,
         ),
         child: Row(
           children: [
@@ -184,7 +187,7 @@ class _DetectedLanguageCard extends StatelessWidget {
                 children: [
                   Text(lang.line, style: TextStyle(fontSize: 15, color: p.text)),
                   if (localeController.detected)
-                    Text('Detected from your phone',
+                    Text('Détectée sur ton téléphone',
                         style: TextStyle(fontSize: 13, color: p.text2)),
                 ],
               ),
@@ -192,12 +195,12 @@ class _DetectedLanguageCard extends StatelessWidget {
             CupertinoButton(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               minSize: 34,
-              color: p.accent.withValues(alpha: .12),
+              color: p.accentSoft,
               borderRadius: BorderRadius.circular(17),
               onPressed: () => _showLanguageSheet(context),
-              child: Text('Change',
+              child: Text('Changer',
                   style: TextStyle(
-                      color: p.accent,
+                      color: p.accentText,
                       fontSize: 15,
                       fontWeight: FontWeight.w600)),
             ),
@@ -221,8 +224,8 @@ class _DetectedLanguageCard extends StatelessWidget {
           child: CupertinoListSection.insetGrouped(
             margin: EdgeInsets.zero,
             backgroundColor: p.bg,
-            header: const Text('THE LANGUAGE YOUR TUTOR EXPLAINS IN'),
-            footer: const Text('More languages are coming.'),
+            header: const Text('LA LANGUE DANS LAQUELLE TON PROF EXPLIQUE'),
+            footer: const Text('D’autres langues arrivent.'),
             children: [
               for (final l in supportedTutorLanguages)
                 CupertinoListTile(

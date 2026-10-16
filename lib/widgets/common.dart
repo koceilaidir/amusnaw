@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../theme/mark.dart';
 
 /// Carte arrondie iOS (fond « secondary grouped »).
 class AppCard extends StatelessWidget {
@@ -10,7 +11,7 @@ class AppCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.color,
-    this.radius = 22,
+    this.radius = 20,
   });
 
   final Widget child;
@@ -26,6 +27,8 @@ class AppCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? p.surface,
         borderRadius: BorderRadius.circular(radius),
+        border: color == null ? Border.all(color: p.separator, width: .5) : null,
+        boxShadow: color == null ? p.shadow : null,
       ),
       child: child,
     );
@@ -45,10 +48,10 @@ class TintIcon extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: p.accent.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(8),
+        color: p.accentSoft,
+        borderRadius: BorderRadius.circular(size * .3),
       ),
-      child: Icon(icon, size: size * .55, color: p.accent),
+      child: Icon(icon, size: size * .55, color: p.accentText),
     );
   }
 }
@@ -71,22 +74,13 @@ class Caption extends StatelessWidget {
       );
 }
 
-/// Avatar du prof : ⵣ blanc sur la couleur principale.
+/// Avatar du prof : le symbole d'Amusnaw.
 class TutorAvatar extends StatelessWidget {
   const TutorAvatar({super.key, this.size = 36});
   final double size;
 
   @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: p.accent, shape: BoxShape.circle),
-      child: Text('ⵣ', style: AppTheme.tifinagh(size: size * .5, color: p.onAccent)),
-    );
-  }
+  Widget build(BuildContext context) => AmusnawMark(size: size, color: AppPalette.of(context).text);
 }
 
 /// Bouton principal plein largeur.

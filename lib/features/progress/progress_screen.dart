@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/learning/learner_store.dart';
 import '../../theme/app_theme.dart';
-import '../../theme/filigree.dart';
 import '../../widgets/common.dart';
 
 /// Écran 5 : progression A1 → B2 et compétences.
@@ -13,10 +12,10 @@ class ProgressScreen extends StatelessWidget {
   const ProgressScreen({super.key});
 
   static const _path = [
-    ('A1', 'First words', 'Greetings, family, food'),
-    ('A2', 'Everyday life', 'The village, the market'),
-    ('B1', 'Real conversations', 'Proverbs, songs, opinions'),
-    ('B2', 'Literature & history', 'Poetry, Mammeri, Berber Spring'),
+    ('A1', 'Premiers mots', 'Salutations, famille, repas'),
+    ('A2', 'La vie de tous les jours', 'Le village, le marché'),
+    ('B1', 'Vraies conversations', 'Proverbes, chansons, opinions'),
+    ('B2', 'Littérature et histoire', 'Poésie, Mammeri, Printemps berbère'),
   ];
 
   @override
@@ -28,10 +27,9 @@ class ProgressScreen extends StatelessWidget {
         final pct = (s.levelProgress * 100).round();
         return Stack(
           children: [
-            const Positioned(top: -110, right: -130, child: Rosette(size: 340, opacity: .12)),
             CustomScrollView(
               slivers: [
-                largeTitleBar(context, 'Progress'),
+                largeTitleBar(context, 'Progression'),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   sliver: SliverList.list(children: [
@@ -39,7 +37,7 @@ class ProgressScreen extends StatelessWidget {
                       padding: const EdgeInsets.all(18),
                       child: Row(children: [
                         Semantics(
-                          label: 'Level A1, $pct percent complete',
+                          label: 'Niveau A1, $pct pour cent',
                           child: SizedBox(
                             width: 88,
                             height: 88,
@@ -58,7 +56,7 @@ class ProgressScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('Tazwara', style: AppTheme.serif(size: 22, color: p.text)),
-                              Text('The beginning · $pct%', style: TextStyle(fontSize: 15, color: p.text2)),
+                              Text('Le début · $pct %', style: TextStyle(fontSize: 15, color: p.text2)),
                               const SizedBox(height: 8),
                               Wrap(spacing: 16, children: [
                                 _Stat(s.learnedTotal, 'words'),
@@ -74,7 +72,7 @@ class ProgressScreen extends StatelessWidget {
                     CupertinoListSection.insetGrouped(
                       margin: EdgeInsets.zero,
                       backgroundColor: p.bg,
-                      header: const Text('YOUR PATH'),
+                      header: const Text('TON PARCOURS'),
                       children: [
                         for (final (i, (code, title, sub)) in _path.indexed)
                           CupertinoListTile(
@@ -83,20 +81,20 @@ class ProgressScreen extends StatelessWidget {
                               height: 30,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: i == 0 ? p.accent : p.fill,
+                                color: i == 0 ? p.ink : p.fill,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(code,
                                   style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
-                                      color: i == 0 ? p.onAccent : p.text2)),
+                                      color: i == 0 ? p.onInk : p.text2)),
                             ),
                             title: Text(title, style: TextStyle(color: p.text)),
                             subtitle: Text(sub, style: TextStyle(color: p.text2)),
                             trailing: i == 0
-                                ? Text('Now',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.accent))
+                                ? Text('En cours',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.accentText))
                                 : const CupertinoListTileChevron(),
                           ),
                       ],
@@ -104,7 +102,7 @@ class ProgressScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                      child: Text('SKILLS', style: TextStyle(fontSize: 13, color: p.text2)),
+                      child: Text('COMPÉTENCES', style: TextStyle(fontSize: 13, color: p.text2)),
                     ),
                     AppCard(
                       radius: 12,
@@ -115,7 +113,7 @@ class ProgressScreen extends StatelessWidget {
                             child: Row(children: [
                               SizedBox(
                                   width: 116,
-                                  child: Text(e.key, style: TextStyle(fontSize: 15, color: p.text))),
+                                  child: Text(_skillLabels[e.key] ?? e.key, style: TextStyle(fontSize: 15, color: p.text))),
                               Expanded(
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(3),
@@ -184,3 +182,10 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(covariant _RingPainter old) =>
       old.value != value || old.color != color || old.track != track;
 }
+
+const _skillLabels = {
+  'Vocabulary': 'Vocabulaire',
+  'Understanding': 'Compréhension',
+  'Grammar': 'Grammaire',
+  'Culture': 'Culture',
+};

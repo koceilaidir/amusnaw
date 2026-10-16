@@ -27,7 +27,21 @@ class ContentRepository {
   List<LessonSummary>? _lessons;
   final _lessonCache = <String, Lesson>{};
 
+  List<CultureCapsule>? _capsules;
+
+  Future<List<CultureCapsule>> capsules() async {
+    if (_capsules != null) return _capsules!;
+    try {
+      final list = await api.getAny('/content/capsules') as List;
+      _capsules = list.map((e) => CultureCapsule.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (_) {
+      return const [yennayer];
+    }
+    return _capsules!;
+  }
+
   void clear() {
+    _capsules = null;
     _today = null;
     _lessons = null;
     _lessonCache.clear();

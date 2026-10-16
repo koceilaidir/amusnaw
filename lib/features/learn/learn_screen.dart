@@ -53,7 +53,7 @@ class _LearnScreenState extends State<LearnScreen> {
         return CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            largeTitleBar(context, 'Learn'),
+            largeTitleBar(context, 'Leçons'),
             CupertinoSliverRefreshControl(onRefresh: _refresh),
             if (all == null)
               const SliverToBoxAdapter(
@@ -65,7 +65,7 @@ class _LearnScreenState extends State<LearnScreen> {
                   backgroundColor: p.bg,
                   header: Text(entry.key.toUpperCase()),
                   footer: entry.key == levels.keys.last
-                      ? const Text('New lessons are added regularly.')
+                      ? const Text('De nouvelles leçons arrivent régulièrement.')
                       : null,
                   children: [
                     for (final l in entry.value)

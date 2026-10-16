@@ -7,7 +7,11 @@ class AppSettingsState {
     this.themeMode = ThemeMode.system,
     this.reminderOn = false,
     this.reminderTime = const TimeOfDay(hour: 19, minute: 0),
+    this.accent = 'terracotta',
   });
+
+  /// Couleur d'accent choisie dans le menu Thème (id de accentChoices).
+  final String accent;
 
   final ThemeMode themeMode;
 
@@ -15,11 +19,12 @@ class AppSettingsState {
   final bool reminderOn;
   final TimeOfDay reminderTime;
 
-  AppSettingsState copyWith({ThemeMode? themeMode, bool? reminderOn, TimeOfDay? reminderTime}) =>
+  AppSettingsState copyWith({ThemeMode? themeMode, bool? reminderOn, TimeOfDay? reminderTime, String? accent}) =>
       AppSettingsState(
         themeMode: themeMode ?? this.themeMode,
         reminderOn: reminderOn ?? this.reminderOn,
         reminderTime: reminderTime ?? this.reminderTime,
+        accent: accent ?? this.accent,
       );
 }
 
@@ -40,12 +45,18 @@ class AppSettings extends ValueNotifier<AppSettingsState> {
         hour: prefs.getInt('reminder_hour') ?? 19,
         minute: prefs.getInt('reminder_minute') ?? 0,
       ),
+      accent: prefs.getString('accent') ?? 'terracotta',
     );
   }
 
   void setThemeMode(ThemeMode m) {
     value = value.copyWith(themeMode: m);
     _prefs?.setString('theme_mode', m.name);
+  }
+
+  void setAccent(String id) {
+    value = value.copyWith(accent: id);
+    _prefs?.setString('accent', id);
   }
 
   void setReminder({required bool on, TimeOfDay? time}) {

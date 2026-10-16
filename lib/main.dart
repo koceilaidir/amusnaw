@@ -4,11 +4,12 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/auth/auth_service.dart';
+import 'core/chat/conversation_store.dart';
 import 'core/learning/learner_store.dart';
 import 'core/locale/locale_controller.dart';
 import 'core/notifications/reminder_service.dart';
 import 'core/settings/app_settings.dart';
-import 'features/home/home_shell.dart';
+import 'features/tutor/tutor_chat_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -19,6 +20,7 @@ Future<void> main() async {
   localeController.load(prefs);
   appSettings.load(prefs);
   await learnerStore.load(prefs);
+  conversationStore.load(prefs);
   String? token;
   try {
     token = await authService.currentToken();
@@ -35,7 +37,7 @@ class AmusnawApp extends StatelessWidget {
   const AmusnawApp({super.key, this.signedIn = false});
 
   /// Déjà connecté : on ouvre directement l'app (le jeton est revérifié
-  /// par HomeShell ; s'il a expiré, retour à l'accueil).
+  /// par l’écran de chat ; s'il a expiré, retour à l'accueil).
   final bool signedIn;
 
   @override
@@ -45,8 +47,8 @@ class AmusnawApp extends StatelessWidget {
       builder: (context, _) => MaterialApp(
         title: 'Amusnaw',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
+        theme: AppTheme.build(Brightness.light, accentById(appSettings.value.accent)),
+        darkTheme: AppTheme.build(Brightness.dark, accentById(appSettings.value.accent)),
         themeMode: appSettings.value.themeMode,
         locale: localeController.locale,
         localizationsDelegates: const [
@@ -57,7 +59,7 @@ class AmusnawApp extends StatelessWidget {
         supportedLocales: [
           for (final l in supportedTutorLanguages) Locale(l.code),
         ],
-        home: signedIn ? const HomeShell() : const WelcomeScreen(),
+        home: signedIn ? const TutorChatScreen() : const WelcomeScreen(),
       ),
     );
   }

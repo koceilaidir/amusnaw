@@ -3,46 +3,84 @@ import 'package:flutter/material.dart';
 
 import '../content/sample_content.dart';
 import '../theme/app_theme.dart';
-import '../theme/filigree.dart';
-import 'common.dart';
+import '../theme/mark.dart';
 
-/// Carte « mot » : le mot kabyle, son écriture tifinagh et son sens.
+/// Petite légende en capitales (EXERCICE, NOUVEAU MOT…).
+class _Label extends StatelessWidget {
+  const _Label(this.text, {this.color});
+  final String text;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Text(text.toUpperCase(),
+      style: TextStyle(
+          fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: .6, color: color ?? AppPalette.of(context).text2));
+}
+
+BoxDecoration cardDecoration(AppPalette p, {Color? color, double radius = 20}) => BoxDecoration(
+      color: color ?? p.surface,
+      borderRadius: BorderRadius.circular(radius),
+      border: color == null ? Border.all(color: p.separator, width: .5) : null,
+      boxShadow: color == null ? p.shadow : null,
+    );
+
+/// Carte « mot » : tuile tifinagh, mot kabyle et sens.
 class WordCard extends StatelessWidget {
-  const WordCard(
-      {super.key, required this.word, this.caption = 'Word of the day', this.compact = false, this.color});
+  const WordCard({super.key, required this.word, this.caption = 'Nouveau mot', this.badge});
   final WordOfTheDay word;
   final String caption;
-  final bool compact;
-  final Color? color;
+
+  /// Pastille à droite (« +1 · 25 mots »), facultative.
+  final String? badge;
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return AppCard(
-      color: color,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Caption(caption),
-          const SizedBox(height: 8),
-          Text(word.word, style: AppTheme.serif(size: compact ? 24 : 28, color: p.text)),
-          if (word.tifinagh.isNotEmpty)
-            ExcludeSemantics(
-              child: Text(word.tifinagh,
-                  style: AppTheme.tifinagh(size: 13, color: p.text2).copyWith(letterSpacing: 2)),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+      decoration: cardDecoration(p),
+      child: Row(children: [
+        Container(
+          width: 52,
+          height: 52,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(color: p.accentSoft, borderRadius: BorderRadius.circular(12)),
+          child: ExcludeSemantics(
+            child: FittedBox(
+              child: Text(word.tifinagh.isEmpty ? 'ⵣ' : word.tifinagh,
+                  style: AppTheme.tifinagh(size: 15, color: p.accentText).copyWith(letterSpacing: 1)),
             ),
-          const SizedBox(height: 4),
-          Text(word.meaning,
-              maxLines: compact ? null : 3,
-              overflow: compact ? null : TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 15, color: p.text2)),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _Label(caption),
+            const SizedBox(height: 2),
+            Text.rich(
+              TextSpan(children: [
+                TextSpan(text: word.word, style: const TextStyle(fontWeight: FontWeight.w600)),
+                TextSpan(text: ' · ${word.meaning}', style: TextStyle(color: p.text2)),
+              ]),
+              style: TextStyle(fontSize: 18, color: p.text),
+            ),
+          ]),
+        ),
+        if (badge != null) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: p.greenSoft, borderRadius: BorderRadius.circular(12)),
+            child: Text(badge!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.green)),
+          ),
         ],
-      ),
+      ]),
     );
   }
 }
 
-/// Petite carte de capsule culturelle ; un tap ouvre le texte complet.
+/// Carte de capsule culturelle ; un tap ouvre le texte complet.
 class CapsuleCard extends StatelessWidget {
   const CapsuleCard({super.key, required this.capsule, this.showBody = false});
   final CultureCapsule capsule;
@@ -53,39 +91,34 @@ class CapsuleCard extends StatelessWidget {
     final p = AppPalette.of(context);
     return GestureDetector(
       onTap: () => showCapsuleSheet(context, capsule),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: Stack(children: [
-          AppCard(
-            color: p.goldSoft,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Caption('Culture · ${capsule.title}', color: p.gold),
-                const SizedBox(height: 8),
-                Text(capsule.kab.isNotEmpty ? capsule.kab : capsule.title,
-                    style: AppTheme.serif(size: 19, color: p.text).copyWith(height: 1.25)),
-                if (showBody) ...[
-                  const SizedBox(height: 6),
-                  Text(capsule.body,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 14, height: 1.4, color: p.text2)),
-                ],
-                const SizedBox(height: 6),
-                Text('Read', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.gold)),
-              ],
-            ),
-          ),
-          Positioned(right: -40, top: -40, child: Rosette(size: 110, opacity: .22, color: p.gold)),
-        ]),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: cardDecoration(p, color: p.goldSoft),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Label('Culture · ${capsule.title}', color: p.gold),
+            const SizedBox(height: 6),
+            Text(capsule.kab.isNotEmpty ? capsule.kab : capsule.title,
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: p.text, letterSpacing: -.3)),
+            if (showBody) ...[
+              const SizedBox(height: 6),
+              Text(capsule.body,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, height: 1.45, color: p.text2)),
+            ],
+            const SizedBox(height: 8),
+            Text('Lire', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.gold)),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Feuille iOS avec le texte complet d'une capsule.
-Future<void> showCapsuleSheet(BuildContext context, CultureCapsule c) {
+/// Feuille iOS avec un contenu défilant.
+Future<void> showAppSheet(BuildContext context, {required List<Widget> Function(AppPalette p) children}) {
   return showModalBottomSheet(
     context: context,
     useRootNavigator: true,
@@ -100,12 +133,12 @@ Future<void> showCapsuleSheet(BuildContext context, CultureCapsule c) {
         expand: false,
         builder: (context, scroll) => Container(
           decoration: BoxDecoration(
-            color: p.bg,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            color: p.panel,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: ListView(
             controller: scroll,
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
+            padding: const EdgeInsets.fromLTRB(24, 10, 24, 40),
             children: [
               Center(
                 child: Container(
@@ -114,14 +147,8 @@ Future<void> showCapsuleSheet(BuildContext context, CultureCapsule c) {
                   decoration: BoxDecoration(color: p.separator, borderRadius: BorderRadius.circular(3)),
                 ),
               ),
-              const SizedBox(height: 18),
-              Caption('Culture · ${c.title}', color: p.gold),
-              const SizedBox(height: 8),
-              Text(c.kab.isNotEmpty ? c.kab : c.title, style: AppTheme.serif(size: 28, color: p.text)),
-              const SizedBox(height: 14),
-              Text(c.body, style: TextStyle(fontSize: 17, height: 1.55, color: p.text)),
-              const SizedBox(height: 24),
-              Center(child: Rosette(size: 48, opacity: .5, color: p.gold)),
+              const SizedBox(height: 22),
+              ...children(p),
             ],
           ),
         ),
@@ -130,12 +157,38 @@ Future<void> showCapsuleSheet(BuildContext context, CultureCapsule c) {
   );
 }
 
+Future<void> showCapsuleSheet(BuildContext context, CultureCapsule c) => showAppSheet(context,
+    children: (p) => [
+          _Label('Culture · ${c.title}', color: p.gold),
+          const SizedBox(height: 8),
+          Text(c.kab.isNotEmpty ? c.kab : c.title, style: AppTheme.serif(size: 30, color: p.text)),
+          const SizedBox(height: 14),
+          Text(c.body, style: TextStyle(fontSize: 17, height: 1.55, color: p.text)),
+          const SizedBox(height: 28),
+          Center(child: AmusnawMark(size: 34, color: p.gold)),
+        ]);
+
+Future<void> showWordSheet(BuildContext context, WordOfTheDay w) => showAppSheet(context,
+    children: (p) => [
+          const _Label('Mot du jour'),
+          const SizedBox(height: 10),
+          Text(w.word, style: AppTheme.serif(size: 44, color: p.text)),
+          if (w.tifinagh.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(w.tifinagh, style: AppTheme.tifinagh(size: 22, color: p.accentText).copyWith(letterSpacing: 3)),
+          ],
+          const SizedBox(height: 14),
+          Text(w.meaning, style: TextStyle(fontSize: 20, color: p.text2)),
+          const SizedBox(height: 24),
+          Text('Essaie de l’employer dans une conversation un autre jour : il comptera alors dans tes mots appris.',
+              style: TextStyle(fontSize: 15, height: 1.45, color: p.text2)),
+        ]);
+
 /// Exercice compact à choix, affiché dans le chat.
 class InlineExercise extends StatefulWidget {
-  const InlineExercise({super.key, required this.exercise, this.onCorrect, this.color});
+  const InlineExercise({super.key, required this.exercise, this.onCorrect});
   final ChoiceExercise exercise;
   final VoidCallback? onCorrect;
-  final Color? color;
 
   @override
   State<InlineExercise> createState() => _InlineExerciseState();
@@ -151,54 +204,130 @@ class _InlineExerciseState extends State<InlineExercise> {
     if (o == widget.exercise.answer) widget.onCorrect?.call();
   }
 
+  Widget _option(AppPalette p, String o) {
+    final picked = _picked == o;
+    final right = o == widget.exercise.answer;
+    return GestureDetector(
+      onTap: () => _pick(o),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        constraints: const BoxConstraints(minHeight: 44),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: picked ? (right ? p.greenSoft : p.goldSoft) : p.fill,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: picked ? (right ? p.green : p.gold) : Colors.transparent, width: 1.5),
+        ),
+        child: Text(o,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: picked ? (right ? p.green : p.gold) : (_done ? p.text2 : p.text),
+              fontWeight: picked ? FontWeight.w600 : FontWeight.w400,
+            )),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final ex = widget.exercise;
-    return AppCard(
-      radius: 18,
-      color: widget.color,
+    final short = ex.options.every((o) => o.length <= 10);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: cardDecoration(p),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Caption(ex.instruction),
+          const _Label('Exercice'),
           const SizedBox(height: 6),
           Text(ex.hasBlank ? '${ex.before}_____${ex.after}' : ex.before,
-              style: AppTheme.serif(size: 24, color: p.text)),
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: p.text, letterSpacing: -.3)),
           if (ex.tifinagh != null && ex.tifinagh!.isNotEmpty)
             ExcludeSemantics(
               child: Text(ex.tifinagh!,
                   style: AppTheme.tifinagh(size: 13, color: p.text2).copyWith(letterSpacing: 2)),
             ),
           const SizedBox(height: 12),
-          for (final o in ex.options) ...[
-            GestureDetector(
-              onTap: () => _pick(o),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                decoration: BoxDecoration(
-                  color: _picked == o ? (o == ex.answer ? p.greenSoft : p.goldSoft) : (widget.color != null ? p.surface : p.fill),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(o,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: _picked == o ? (o == ex.answer ? p.green : p.gold) : p.text,
-                      fontWeight: _picked == o ? FontWeight.w600 : FontWeight.w400,
-                    )),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          if (_picked != null)
+          if (short)
+            Row(children: [
+              for (var i = 0; i < ex.options.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(child: _option(p, ex.options[i])),
+              ],
+            ])
+          else
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (var i = 0; i < ex.options.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                _option(p, ex.options[i]),
+              ],
+            ]),
+          if (_picked != null) ...[
+            const SizedBox(height: 10),
             Text(
-              _done ? ex.explanation : 'Not quite — try another one.',
+              _done ? ex.explanation : 'Pas tout à fait — essaie une autre réponse.',
               style: TextStyle(fontSize: 14, height: 1.4, color: _done ? p.green : p.gold),
             ),
+          ],
         ],
       ),
     );
   }
 }
+
+/// Bouton rond flottant (menu, thème) de la barre du haut.
+class RoundIconButton extends StatelessWidget {
+  const RoundIconButton({super.key, required this.icon, required this.label, required this.onPressed});
+  final Widget icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Semantics(
+      label: label,
+      button: true,
+      child: GestureDetector(
+        onTap: onPressed,
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: p.surface,
+            shape: BoxShape.circle,
+            border: Border.all(color: p.separator, width: .5),
+            boxShadow: p.shadow,
+          ),
+          child: icon,
+        ),
+      ),
+    );
+  }
+}
+
+/// Icône « menu » à deux traits, comme sur la maquette.
+class MenuGlyph extends StatelessWidget {
+  const MenuGlyph({super.key, required this.color});
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 18,
+        height: 12,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(width: 18, height: 1.8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(1))),
+            Container(width: 11, height: 1.8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(1))),
+          ],
+        ),
+      );
+}
+
+const kCupertinoChevron = CupertinoIcons.chevron_right;

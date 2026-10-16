@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 import '../../features/onboarding/welcome_screen.dart';
+import '../chat/conversation_store.dart';
 import '../content/content_repository.dart';
 import '../learning/learner_store.dart';
 import '../notifications/reminder_service.dart';
@@ -13,6 +14,7 @@ Future<void> endSession(BuildContext context) async {
   final nav = Navigator.of(context, rootNavigator: true);
   await authService.signOut().catchError((_) {});
   await learnerStore.reset();
+  await conversationStore.clear();
   await reminderService.cancel().catchError((_) {});
   await appSettings.reset();
   contentRepository.clear();

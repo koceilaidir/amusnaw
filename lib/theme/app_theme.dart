@@ -1,77 +1,154 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-/// Palette de la maquette, inspirée des couleurs système iOS.
-/// Couleur principale : indigo amazigh (modifiable ici uniquement).
-class AppPalette {
+/// Couleurs d'accent proposées dans le menu Thème (en haut à droite).
+class AccentChoice {
+  const AccentChoice(this.id, this.label, this.light, this.lightText, this.lightSoft, this.dark, this.darkSoft);
+  final String id, label;
+  final Color light, lightText, lightSoft, dark, darkSoft;
+}
+
+const accentChoices = <AccentChoice>[
+  AccentChoice('terracotta', 'Terre cuite', Color(0xFFAD5A2A), Color(0xFF9A4F24), Color(0xFFF5E4D7),
+      Color(0xFFE39A68), Color(0xFF3A281C)),
+  AccentChoice('ocre', 'Ocre', Color(0xFF9A7020), Color(0xFF835D1A), Color(0xFFF3E9D0), Color(0xFFD9B158),
+      Color(0xFF352B17)),
+  AccentChoice('indigo', 'Indigo', Color(0xFF2F54C8), Color(0xFF2F54C8), Color(0xFFE2E8FA), Color(0xFF8EA4F2),
+      Color(0xFF1E2742)),
+  AccentChoice('olivier', 'Olivier', Color(0xFF56662E), Color(0xFF56662E), Color(0xFFE7ECD9), Color(0xFFA9BD72),
+      Color(0xFF283020)),
+];
+
+AccentChoice accentById(String? id) =>
+    accentChoices.firstWhere((a) => a.id == id, orElse: () => accentChoices.first);
+
+/// Palette de la maquette V2 : tons pierre chauds, une couleur d'accent.
+/// Attachée au thème (ThemeExtension) : `AppPalette.of(context)`.
+class AppPalette extends ThemeExtension<AppPalette> {
   const AppPalette({
+    required this.bgTop,
     required this.bg,
     required this.surface,
+    required this.panel,
+    required this.bubble,
+    required this.fill,
     required this.text,
     required this.text2,
     required this.separator,
-    required this.fill,
+    required this.ink,
+    required this.onInk,
     required this.accent,
+    required this.accentText,
+    required this.accentSoft,
     required this.onAccent,
     required this.gold,
     required this.goldSoft,
     required this.green,
     required this.greenSoft,
+    required this.isDark,
   });
 
-  final Color bg, surface, text, text2, separator, fill;
-  final Color accent, onAccent, gold, goldSoft, green, greenSoft;
+  final Color bgTop, bg, surface, panel, bubble, fill, text, text2, separator, ink, onInk;
+  final Color accent, accentText, accentSoft, onAccent, gold, goldSoft, green, greenSoft;
+  final bool isDark;
 
-  static const light = AppPalette(
-    bg: Color(0xFFF2F2F7),
-    surface: Color(0xFFFFFFFF),
-    text: Color(0xFF000000),
-    text2: Color(0xFF6C6C70),
-    separator: Color(0xFFC6C6C8),
-    fill: Color(0xFFE3E3E8),
-    accent: Color(0xFF2F54C8),
-    onAccent: Color(0xFFFFFFFF),
-    gold: Color(0xFF7A5A12),
-    goldSoft: Color(0xFFF6EEDB),
-    green: Color(0xFF1F7A35),
-    greenSoft: Color(0xFFE2F3E6),
-  );
+  factory AppPalette.build(Brightness b, AccentChoice a) => b == Brightness.dark
+      ? AppPalette(
+          bgTop: const Color(0xFF231F1B),
+          bg: const Color(0xFF141312),
+          surface: const Color(0xFF1E1D1B),
+          panel: const Color(0xFF1E1D1B),
+          bubble: const Color(0xFF2B2926),
+          fill: const Color(0xFF2B2926),
+          text: const Color(0xFFF3EFE8),
+          text2: const Color(0xFFABA59C),
+          separator: const Color(0xFF36332F),
+          ink: const Color(0xFFF3EFE8),
+          onInk: const Color(0xFF141312),
+          accent: a.dark,
+          accentText: a.dark,
+          accentSoft: a.darkSoft,
+          onAccent: const Color(0xFF1A120C),
+          gold: const Color(0xFFE0BC74),
+          goldSoft: const Color(0xFF2E2717),
+          green: const Color(0xFF7BC897),
+          greenSoft: const Color(0xFF1E2E24),
+          isDark: true,
+        )
+      : AppPalette(
+          bgTop: const Color(0xFFEFE7DC),
+          bg: const Color(0xFFF6F4F0),
+          surface: const Color(0xFFFFFFFF),
+          panel: const Color(0xFFFBFAF8),
+          bubble: const Color(0xFFECE8E1),
+          fill: const Color(0xFFEEEBE5),
+          text: const Color(0xFF1D1B18),
+          text2: const Color(0xFF6B675F),
+          separator: const Color(0xFFE3DED5),
+          ink: const Color(0xFF1D1B18),
+          onInk: const Color(0xFFFAF8F4),
+          accent: a.light,
+          accentText: a.lightText,
+          accentSoft: a.lightSoft,
+          onAccent: const Color(0xFFFFFFFF),
+          gold: const Color(0xFF7A5A12),
+          goldSoft: const Color(0xFFF4ECD9),
+          green: const Color(0xFF2A7448),
+          greenSoft: const Color(0xFFE1EFE5),
+          isDark: false,
+        );
 
-  static const dark = AppPalette(
-    bg: Color(0xFF000000),
-    surface: Color(0xFF1C1C1E),
-    text: Color(0xFFFFFFFF),
-    text2: Color(0xFFAEAEB2),
-    separator: Color(0xFF38383A),
-    fill: Color(0xFF2C2C2E),
-    accent: Color(0xFF7D97F5),
-    onAccent: Color(0xFF0A1230),
-    gold: Color(0xFFE6C27A),
-    goldSoft: Color(0xFF2A2416),
-    green: Color(0xFF30D158),
-    greenSoft: Color(0xFF0E2A17),
-  );
+  /// Ombre douce des cartes (aucune en sombre, la bordure suffit).
+  List<BoxShadow> get shadow => isDark
+      ? const []
+      : const [
+          BoxShadow(color: Color(0x0D1D1B18), blurRadius: 2, offset: Offset(0, 1)),
+          BoxShadow(color: Color(0x0D1D1B18), blurRadius: 20, offset: Offset(0, 6)),
+        ];
+
+  List<BoxShadow> get shadowLg => isDark
+      ? const [BoxShadow(color: Color(0x59000000), blurRadius: 30, offset: Offset(0, 10))]
+      : const [
+          BoxShadow(color: Color(0x0F1D1B18), blurRadius: 2, offset: Offset(0, 1)),
+          BoxShadow(color: Color(0x141D1B18), blurRadius: 32, offset: Offset(0, 12)),
+        ];
 
   static AppPalette of(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? dark : light;
+      Theme.of(context).extension<AppPalette>() ??
+      AppPalette.build(Theme.of(context).brightness, accentChoices.first);
+
+  @override
+  AppPalette copyWith() => this;
+
+  @override
+  AppPalette lerp(ThemeExtension<AppPalette>? other, double t) =>
+      other is AppPalette && t > .5 ? other : this;
 }
 
 class AppTheme {
-  /// Titres « éditoriaux » (Azul., mots kabyles) — couvre ɛ ɣ ḍ ṭ ẓ ṛ ṣ ḥ č ǧ.
-  static TextStyle serif({double size = 28, Color? color}) =>
-      GoogleFonts.notoSerif(fontSize: size, color: color, height: 1.15);
+  static const font = 'Onest';
+  static const tifinaghFont = 'NotoSansTifinagh';
 
-  /// Tifinagh pour logo et filigranes.
+  /// Titres (Azul, mots kabyles). Onest affiche ɛ ɣ ḍ ṭ ẓ ṛ ṣ ḥ č ǧ.
+  static TextStyle serif({double size = 28, Color? color}) => TextStyle(
+        fontFamily: font,
+        fontSize: size,
+        color: color,
+        height: 1.15,
+        fontWeight: FontWeight.w500,
+        letterSpacing: -size * .025,
+      );
+
+  /// Tifinagh (mot du jour, cartes).
   static TextStyle tifinagh({double size = 20, Color? color}) =>
-      GoogleFonts.getFont('Noto Sans Tifinagh', fontSize: size, color: color);
+      TextStyle(fontFamily: tifinaghFont, fontSize: size, color: color);
 
-  static ThemeData light() => _build(AppPalette.light, Brightness.light);
-  static ThemeData dark() => _build(AppPalette.dark, Brightness.dark);
-
-  static ThemeData _build(AppPalette p, Brightness b) {
+  static ThemeData build(Brightness b, AccentChoice accent) {
+    final p = AppPalette.build(b, accent);
     final base = ThemeData(
       useMaterial3: true,
       brightness: b,
+      fontFamily: font,
       // Comportements iOS (retour par glissement, rebond) sur toutes les plateformes.
       platform: TargetPlatform.iOS,
       colorScheme: ColorScheme.fromSeed(
@@ -86,20 +163,18 @@ class AppTheme {
       dividerColor: p.separator,
       splashFactory: NoSplash.splashFactory,
       highlightColor: Colors.transparent,
+      extensions: [p],
     );
-    // Sur iPhone, la police système (SF Pro) est utilisée automatiquement ;
-    // Noto Sans sert de repli ailleurs.
-    final text = GoogleFonts.notoSansTextTheme(base.textTheme)
-        .apply(bodyColor: p.text, displayColor: p.text);
     return base.copyWith(
-      textTheme: text,
+      textTheme: base.textTheme.apply(fontFamily: font, bodyColor: p.text, displayColor: p.text),
+      cupertinoOverrideTheme: CupertinoThemeDataFont.of(p, b),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: p.accent,
-          foregroundColor: p.onAccent,
+          backgroundColor: p.ink,
+          foregroundColor: p.onInk,
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+          textStyle: const TextStyle(fontFamily: font, fontSize: 17, fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -108,10 +183,29 @@ class AppTheme {
           backgroundColor: p.surface,
           minimumSize: const Size.fromHeight(52),
           side: BorderSide(color: p.separator),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+          textStyle: const TextStyle(fontFamily: font, fontSize: 17, fontWeight: FontWeight.w600),
         ),
       ),
     );
   }
+}
+
+/// Police Onest aussi pour les widgets Cupertino (listes, barres).
+class CupertinoThemeDataFont {
+  static NoDefaultCupertinoThemeData of(AppPalette p, Brightness b) => NoDefaultCupertinoThemeData(
+        brightness: b,
+        primaryColor: p.accent,
+        scaffoldBackgroundColor: p.bg,
+        barBackgroundColor: p.bg.withValues(alpha: .92),
+        textTheme: CupertinoTextThemeData(
+          primaryColor: p.accent,
+          textStyle: TextStyle(fontFamily: AppTheme.font, fontSize: 17, color: p.text, letterSpacing: -.2),
+          navLargeTitleTextStyle: TextStyle(
+              fontFamily: AppTheme.font, fontSize: 32, fontWeight: FontWeight.w600, color: p.text, letterSpacing: -.8),
+          navTitleTextStyle:
+              TextStyle(fontFamily: AppTheme.font, fontSize: 17, fontWeight: FontWeight.w600, color: p.text),
+          actionTextStyle: TextStyle(fontFamily: AppTheme.font, fontSize: 17, color: p.accentText),
+        ),
+      );
 }

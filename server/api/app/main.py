@@ -123,6 +123,16 @@ class ChatIn(BaseModel):
     # Décalage horaire de l'élève en minutes (ex. +60 à Tizi-Ouzou) : sert à
     # savoir si un mot a été découvert « un autre jour ».
     tz_offset_minutes: int = Field(0, ge=-840, le=840)
+    # Choix fait sur l'écran d'accueil : "learn" (apprendre) ou "talk" (discuter).
+    intent: str | None = Field(None, max_length=16)
+
+
+INTENT_HINTS = {
+    "learn": "\n\nL'élève vient de choisir « Apprendre » : propose tout de suite une petite "
+             "activité sur la leçon en cours et termine par [[EXERCICE]].",
+    "talk": "\n\nL'élève vient de choisir « Discuter » : propose deux ou trois sujets de culture "
+            "ou d'histoire kabyles (fêtes, village, chansons, personnages) et laisse-le choisir.",
+}
 
 
 def _prepare_turn(body: "ChatIn", user: User, db: Session):
@@ -150,14 +160,17 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session):
         references=kb.references_for(context),
         words_to_reuse=learning.words_to_reuse(db, user.id, tz),
     )
+    system += INTENT_HINTS.get(body.intent or "", "")
     return profile, newly_learned, system, history
 
 
 def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
-                 off_topic: bool, newly_learned: list[str]) -> dict:
+                 off_topic: bool, newly_learned: list[str], intent: str | None = None) -> dict:
     """Ce qui suit la réponse : blocs, mots découverts, historique, total."""
     model = None if off_topic else get_settings().llm_model
     reply, markers = content.strip_markers(reply)
+    if intent == "learn" and not any(k in ("EXERCICE", "EXERCISE") for k, _ in markers):
+        markers.append(("EXERCICE", ""))  # « Apprendre » donne toujours un exercice
     blocks = content.build_blocks(reply, markers, seed=f"{user.id}{len(reply)}") if not off_topic else []
     if not off_topic:
         # 2. Les mots kabyles employés par le prof sont « découverts » aujourd'hui.
@@ -187,7 +200,7 @@ async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = D
         reply = await tutor.ask_model(system, history, body.message)
     except Exception as e:  # modèle indisponible
         raise HTTPException(503, "Tutor is unavailable, try again shortly.") from e
-    return _finish_turn(db, user, profile, body.message, reply, False, newly)
+    return _finish_turn(db, user, profile, body.message, reply, False, newly, body.intent)
 
 
 @app.post("/tutor/chat/stream")
@@ -225,7 +238,7 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
             yield event({"type": "error", "message": "Tutor is unavailable, try again shortly."})
             return
         reply = "".join(parts).strip()
-        yield event({"type": "done", **_finish_turn(db, user, profile, body.message, reply, False, newly)})
+        yield event({"type": "done", **_finish_turn(db, user, profile, body.message, reply, False, newly, body.intent)})
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

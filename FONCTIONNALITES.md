@@ -38,11 +38,17 @@ Ce journal est tenu au fil du projet. Il sert de base au PDF de présentation de
 - Progression enregistrée sur le téléphone et sur le serveur.
 - Parcours A1 → B2 (Tazwara…), compétences (vocabulaire, compréhension, grammaire, culture).
 
-### Design
-- Icône : le **yaz ⵣ** blanc sur fond indigo.
+### Design (V2, « le chat d'abord »)
+- **L'app s'ouvre toujours sur le chat**, comme Claude ou ChatGPT : « Azul, Koceila. », un rappel des derniers mots vus, puis la question « On apprend, ou on parle d'autre chose ? » avec deux cartes **Apprendre** (leçon du jour, 8 min) et **Discuter** (culture, histoire, chansons), et des idées de sujets sous la saisie.
+- **Menu en haut à gauche** : nouvelle conversation, leçons, mot du jour, culture et histoire, progression, **conversations récentes** (gardées sur le téléphone), profil et réglages.
+- **Thème en haut à droite** : Automatique / Clair / Sombre et 4 couleurs (terre cuite, ocre, indigo, olivier).
+- Bouton « + » de la saisie : raccourcis (leçons, mot du jour, réviser mes mots, culture).
+- **Logo** : l'étoile amazighe (itri) redessinée en traits arrondis ; icône d'app blanc cassé sur fond encre.
+- **Police Onest** (embarquée dans l'app, fonctionne hors ligne), choisie parce qu'elle affiche tout l'alphabet kabyle (ɛ ɣ ḍ ṭ ẓ ṛ ḥ ṣ č ǧ).
+- Interface en français.
 - Style iOS (grands titres, listes groupées, barre d'onglets à icônes pleines).
 - **Thème clair et sombre** automatique.
-- Couleur principale indigo amazigh, filigranes discrets (rosace, Tifinagh).
+- Tons pierre chauds, une seule couleur d'accent, ombres très légères.
 
 ## 2. Côté technique
 
