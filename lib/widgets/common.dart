@@ -107,3 +107,30 @@ CupertinoSliverNavigationBar largeTitleBar(BuildContext context, String title,
     trailing: trailing,
   );
 }
+
+
+/// Grand écran (ordinateur, tablette en paysage) : menu fixe à gauche,
+/// contenu à largeur de lecture.
+const kWideBreakpoint = 900.0;
+
+bool isWide(BuildContext context) => MediaQuery.sizeOf(context).width >= kWideBreakpoint;
+
+/// Centre le contenu à une largeur de lecture confortable sur grand écran.
+class ReadingWidth extends StatelessWidget {
+  const ReadingWidth({super.key, required this.child, this.maxWidth = 760});
+  final Widget child;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, c) => Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            // pleine hauteur quand elle est connue (listes, pages), largeur limitée
+            width: c.maxWidth < maxWidth ? c.maxWidth : maxWidth,
+            height: c.hasBoundedHeight ? c.maxHeight : null,
+            child: child,
+          ),
+        ),
+      );
+}

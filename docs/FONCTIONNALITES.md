@@ -14,6 +14,8 @@ Ce journal est tenu au fil du projet. Il sert de base au PDF de présentation de
 
 ### Site web
 - **La même app dans le navigateur** (Flutter web), servie par le VPS à la même adresse que le prof : ordinateur, tablette ou téléphone, sans rien installer. Mêmes leçons, même prof, mêmes progrès.
+- **Mise en page web** : sur ordinateur, menu fixe à gauche (conversations, leçons, culture, progression, réglages) et conversation centrée à largeur de lecture ; accueil en deux panneaux (marque sur fond olivier, connexion à droite). Sur téléphone, la mise en page de l'app.
+- Favicon et icônes Amusnaw, écran de chargement olivier.
 - Sur le web : « Continuer sans compte » (Google viendra ensuite), pas de rappel quotidien (un navigateur ne programme pas de notification).
 - **Limites anti-abus** : 60 messages par heure et par élève, 10 nouveaux comptes par heure et par connexion ; l'élève reçoit un message bienveillant (« fais une petite pause »).
 

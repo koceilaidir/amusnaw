@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -71,45 +70,8 @@ class AmusnawApp extends StatelessWidget {
         supportedLocales: [
           for (final l in supportedTutorLanguages) Locale(l.code),
         ],
-        // Site web sur grand écran : l'app garde sa largeur de téléphone, centrée
-        builder: (context, child) => kIsWeb ? _WebFrame(child: child!) : child!,
         home: signedIn ? const TutorChatScreen() : const WelcomeScreen(),
       ),
     );
-  }
-}
-
-
-/// Sur ordinateur, l'app s'affiche comme sur un téléphone : une colonne de
-/// 480 px au centre, avec le fond de l'app de part et d'autre.
-class _WebFrame extends StatelessWidget {
-  const _WebFrame({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return LayoutBuilder(builder: (context, c) {
-      if (c.maxWidth <= 560) return child;
-      return ColoredBox(
-        color: p.isDark ? p.bgTop : p.panel,
-        child: Center(
-          child: Container(
-            width: 480,
-            decoration: BoxDecoration(
-              border: Border.symmetric(vertical: BorderSide(color: p.separator)),
-              boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 24)],
-            ),
-            child: ClipRect(
-              child: MediaQuery(
-                // les écrans qui lisent la taille de la fenêtre voient une largeur de téléphone
-                data: MediaQuery.of(context).copyWith(size: Size(480, c.maxHeight)),
-                child: child,
-              ),
-            ),
-          ),
-        ),
-      );
-    });
   }
 }

@@ -8,6 +8,7 @@ import '../../core/learning/learner_store.dart';
 import '../../core/locale/locale_controller.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/mark.dart';
+import '../../widgets/common.dart';
 import '../tutor/tutor_chat_screen.dart';
 
 /// Écran 1 : « Azul. », langue détectée + bouton Changer, connexion rapide.
@@ -80,9 +81,100 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     ));
   }
 
+  /// Boutons de connexion (téléphone et grand écran).
+  List<Widget> _actions(AppPalette p) => [
+    if (_isIOS) ...[
+      FilledButton(
+        onPressed:
+            _busy ? null : () => _signIn(authService.signInWithApple),
+        style: FilledButton.styleFrom(
+          backgroundColor: p.text,
+          foregroundColor: p.bg,
+        ),
+        child: const Text('Continuer avec Apple'),
+      ),
+      const SizedBox(height: 12),
+    ],
+    if (!kIsWeb) // sur le web, Google demande son propre bouton : prévu ensuite
+      OutlinedButton(
+        onPressed:
+            _busy ? null : () => _signIn(authService.signInWithGoogle),
+        child: const Text('Continuer avec Google'),
+      ),
+    if (kIsWeb) // sur le site, c'est l'entrée principale : vrai bouton
+      FilledButton(
+        onPressed: _busy ? null : _testLogin,
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+        child: const Text('Commencer sans compte'),
+      )
+    else
+    CupertinoButton(
+      // Sans compte (prénom seulement) ; la connexion par e-mail viendra plus tard.
+      onPressed: _busy ? null : (_testMode ? _testLogin : null),
+      child: Text(_testMode ? 'Continuer sans compte' : 'Utiliser un e-mail',
+          style: TextStyle(color: p.accentText, fontSize: 17)),
+    ),
+      ];
+
+  /// Grand écran : à gauche le panneau olivier de la marque, à droite la connexion.
+  Widget _wideLayout(AppPalette p) => Row(children: [
+        Expanded(
+          flex: 5,
+          child: Container(
+            color: const Color(0xFF56662E),
+            padding: const EdgeInsets.all(56),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const AmusnawMark(size: 34, color: Color(0xFFF8F6F1)),
+                const SizedBox(width: 12),
+                Text('amusnaw',
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.w600, letterSpacing: -.4, color: Color(0xFFF8F6F1))),
+              ]),
+              const Spacer(),
+              Text('Azul.', style: AppTheme.serif(size: 96, color: const Color(0xFFF8F6F1))),
+              const SizedBox(height: 16),
+              const Text('Je suis Amusnaw, ton prof de kabyle.',
+                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w600, color: Color(0xFFF8F6F1), height: 1.2)),
+              const SizedBox(height: 12),
+              const Text('La langue, la culture et l’histoire — un petit pas par jour.',
+                  style: TextStyle(fontSize: 19, color: Color(0xCCF8F6F1), height: 1.45)),
+              const Spacer(),
+              const Text('Kabyle en écriture latine · Tifinagh · Sources HCA',
+                  style: TextStyle(fontSize: 14, color: Color(0x99F8F6F1))),
+            ]),
+          ),
+        ),
+        Expanded(
+          flex: 4,
+          child: ColoredBox(
+            color: p.bg,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(40),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Text('Commencer', style: AppTheme.serif(size: 40, color: p.text)),
+                    const SizedBox(height: 8),
+                    Text('Huit minutes par jour, à ton rythme.',
+                        style: TextStyle(fontSize: 17, color: p.text2)),
+                    const SizedBox(height: 28),
+                    const _DetectedLanguageCard(),
+                    const SizedBox(height: 28),
+                    ..._actions(p),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ]);
+
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
+    if (isWide(context)) return Scaffold(body: _wideLayout(p));
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -128,30 +220,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   const SizedBox(height: 28),
                   const _DetectedLanguageCard(),
                   const Spacer(),
-                  if (_isIOS) ...[
-                    FilledButton(
-                      onPressed:
-                          _busy ? null : () => _signIn(authService.signInWithApple),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: p.text,
-                        foregroundColor: p.bg,
-                      ),
-                      child: const Text('Continuer avec Apple'),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  if (!kIsWeb) // sur le web, Google demande son propre bouton : prévu ensuite
-                    OutlinedButton(
-                      onPressed:
-                          _busy ? null : () => _signIn(authService.signInWithGoogle),
-                      child: const Text('Continuer avec Google'),
-                    ),
-                  CupertinoButton(
-                    // Sans compte (prénom seulement) ; la connexion par e-mail viendra plus tard.
-                    onPressed: _busy ? null : (_testMode ? _testLogin : null),
-                    child: Text(_testMode ? 'Continuer sans compte' : 'Utiliser un e-mail',
-                        style: TextStyle(color: p.accentText, fontSize: 17)),
-                  ),
+                  ..._actions(p),
                 ],
               ),
             ),
@@ -189,7 +258,7 @@ class _DetectedLanguageCard extends StatelessWidget {
                 children: [
                   Text(lang.line, style: TextStyle(fontSize: 15, color: p.text)),
                   if (localeController.detected)
-                    Text('Détectée sur ton téléphone',
+                    Text(kIsWeb ? 'Détectée dans ton navigateur' : 'Détectée sur ton téléphone',
                         style: TextStyle(fontSize: 13, color: p.text2)),
                 ],
               ),

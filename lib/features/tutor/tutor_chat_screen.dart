@@ -12,6 +12,7 @@ import '../../core/learning/review.dart';
 import '../../core/locale/locale_controller.dart';
 import '../../core/settings/app_settings.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/common.dart';
 import '../../theme/mark.dart';
 import '../../widgets/content_cards.dart';
 import '../culture/culture_screen.dart';
@@ -216,7 +217,10 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   Future<void> _push(Widget screen) async {
     _dropFocus();
     await Navigator.of(context, rootNavigator: true).push(CupertinoPageRoute(
-      builder: (ctx) => Material(color: AppPalette.of(ctx).bg, child: screen),
+      builder: (ctx) => Material(
+        color: AppPalette.of(ctx).bg,
+        child: isWide(ctx) ? ReadingWidth(maxWidth: 820, child: screen) : screen,
+      ),
     ));
     if (mounted) WidgetsBinding.instance.addPostFrameCallback((_) => _dropFocus());
   }
@@ -310,19 +314,24 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     final empty = _messages.isEmpty;
+    final wide = isWide(context);
+    final menu = _AppDrawer(
+      current: _conv.id,
+      onNewChat: _newChat,
+      onOpen: _openConversation,
+      onPush: _push,
+      onWordOfDay: _wordOfDay,
+      docked: wide,
+    );
     return Scaffold(
       key: _scaffold,
       backgroundColor: p.bg,
       drawerScrimColor: const Color(0x52141210),
       onDrawerChanged: (_) => WidgetsBinding.instance.addPostFrameCallback((_) => _dropFocus()),
-      drawer: _AppDrawer(
-        current: _conv.id,
-        onNewChat: _newChat,
-        onOpen: _openConversation,
-        onPush: _push,
-        onWordOfDay: _wordOfDay,
-      ),
-      body: DecoratedBox(
+      drawer: wide ? null : menu,
+      body: Row(children: [
+        if (wide) menu, // grand écran : menu toujours visible à gauche
+        Expanded(child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -339,20 +348,31 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    RoundIconButton(
-                      label: 'Menu',
-                      icon: MenuGlyph(color: p.text),
-                      onPressed: () {
-                        _dropFocus();
-                        _scaffold.currentState?.openDrawer();
-                      },
-                    ),
-                    Row(mainAxisSize: MainAxisSize.min, children: [
-                      AmusnawMark(size: 26, color: p.text),
-                      const SizedBox(width: 8),
-                      Text('amusnaw',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, letterSpacing: -.3, color: p.text)),
-                    ]),
+                    if (wide)
+                      const SizedBox(width: 44)
+                    else
+                      RoundIconButton(
+                        label: 'Menu',
+                        icon: MenuGlyph(color: p.text),
+                        onPressed: () {
+                          _dropFocus();
+                          _scaffold.currentState?.openDrawer();
+                        },
+                      ),
+                    if (wide) // le logo est déjà dans le menu de gauche
+                      Flexible(
+                        child: Text(empty ? '' : _conv.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: p.text2)),
+                      )
+                    else
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        AmusnawMark(size: 26, color: p.text),
+                        const SizedBox(width: 8),
+                        Text('amusnaw',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, letterSpacing: -.3, color: p.text)),
+                      ]),
                     RoundIconButton(
                       label: 'Apparence',
                       icon: Icon(p.isDark ? CupertinoIcons.moon : CupertinoIcons.sun_max, size: 20, color: p.text),
@@ -362,7 +382,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                 ),
               ),
               Expanded(
-                child: AnimatedSwitcher(
+                child: ReadingWidth(child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
                   child: empty
                       ? _Home(
@@ -377,9 +397,9 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                           controller: _scroll,
                           typing: _sending && !_messages.last.fromTutor,
                         ),
-                ),
+                )),
               ),
-              _Composer(
+              ReadingWidth(child: _Composer(
                 controller: _input,
                 sending: _sending,
                 topics: empty ? _topics : const [],
@@ -387,11 +407,12 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                 onTopic: (t) => _send(t, intent: 'talk'),
                 onPlus: _quickActions,
                 focusNode: _inputFocus,
-              ),
+              )),
             ],
           ),
         ),
-      ),
+      )),
+      ]),
     );
   }
 }
@@ -871,7 +892,9 @@ class _AppDrawer extends StatelessWidget {
     required this.onOpen,
     required this.onPush,
     required this.onWordOfDay,
+    this.docked = false,
   });
+  final bool docked;
   final String current;
   final VoidCallback onNewChat, onWordOfDay;
   final ValueChanged<Conversation> onOpen;
@@ -880,7 +903,9 @@ class _AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    void close() => Navigator.of(context).pop();
+    void close() {
+      if (!docked) Navigator.of(context).pop();
+    }
     Widget row(IconData icon, String label, {String? trailing, required VoidCallback onTap}) => GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
@@ -901,11 +926,7 @@ class _AppDrawer extends StatelessWidget {
           ),
         );
 
-    return Drawer(
-      width: 318,
-      backgroundColor: p.panel,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.horizontal(right: Radius.circular(30))),
-      child: SafeArea(
+    final content = SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: ValueListenableBuilder(
@@ -1001,7 +1022,12 @@ class _AppDrawer extends StatelessWidget {
                       onTap: () {
                         close();
                         Navigator.of(context, rootNavigator: true)
-                            .push(CupertinoPageRoute(builder: (_) => const SettingsScreen()));
+                            .push(CupertinoPageRoute(
+                                builder: (ctx) => isWide(ctx)
+                                    ? ColoredBox(
+                                        color: AppPalette.of(ctx).bg,
+                                        child: const ReadingWidth(maxWidth: 820, child: SettingsScreen()))
+                                    : const SettingsScreen()));
                       },
                       child: Container(
                         width: 44,
@@ -1017,7 +1043,22 @@ class _AppDrawer extends StatelessWidget {
             ]),
           ),
         ),
-      ),
+      );
+    if (docked) {
+      return Container(
+        width: 288,
+        decoration: BoxDecoration(
+          color: p.panel,
+          border: Border(right: BorderSide(color: p.separator, width: .5)),
+        ),
+        child: content,
+      );
+    }
+    return Drawer(
+      width: 318,
+      backgroundColor: p.panel,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.horizontal(right: Radius.circular(30))),
+      child: content,
     );
   }
 }
