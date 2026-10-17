@@ -287,7 +287,7 @@ def _find_word(term: str) -> Item | None:
 
 # Vocabulaire courant pour les exercices du chat (pas de termes juridiques
 # ni de néologismes savants).
-EVERYDAY = ("programme", "général", "animaux marins", "animaux", "sciences de la terre")
+EVERYDAY = ("programme", "vocabulaire de base", "corps humain", "général", "animaux marins", "animaux", "sciences de la terre")
 
 
 def _everyday_items() -> list[Item]:
@@ -344,7 +344,12 @@ def unverified_kabyle(reply: str, context: str) -> list[str]:
             continue
         words = [fold(w) for w in re.findall(r"[^\W\d_]+", seg)]
         # Une citation en français (traduction) n'est pas du kabyle : on l'ignore.
-        if all(w in kb.kab_vocab for w in words if len(w) >= 3):
+        from . import router as _r
+        def _known(w):  # w : forme écrite (avec ɣ, ḍ…), pas la forme repliée
+            return fold(w) in kb.kab_vocab or (_r.MORPH is not None and any(
+                "approché" not in a["how"] for a in _r.MORPH.analyze(w)))
+        raw = re.findall(r"[^\W\d_]+(?:-[^\W\d_]+)*", seg.lower())
+        if all(_known(w) for w in raw if len(w) >= 3):
             continue
         if not any(re.search(r"[ɣɛḍṭẓṛṣḥčǧ]", w) or w in kb.kab_vocab for w in re.findall(r"[^\W\d_]+", seg.lower())):
             continue  # aucun indice de kabyle : probablement du français

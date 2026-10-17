@@ -50,6 +50,7 @@ services:
       API_DOMAIN: ${API_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web:/srv/web:ro   # site web : copie de build/web (flutter build web)
       - caddy_data:/data
     depends_on:
       - api

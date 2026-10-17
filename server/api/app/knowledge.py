@@ -46,7 +46,7 @@ KAB_FUNCTION_WORDS = {
 
 
 # Priorité des sources : le programme d'abord, les lexiques spécialisés ensuite.
-DOMAIN_WEIGHT = {"programme": 2.0, "droit": 0.6, "prénoms": 0.25, "langue et didactique": 0.8}
+DOMAIN_WEIGHT = {"programme": 2.0, "vocabulaire de base": 1.6, "corps humain": 1.3, "expressions": 0.9, "appris": 0.5, "mathématiques": 0.6, "droit": 0.6, "prénoms": 0.25, "langue et didactique": 0.8, "tatoeba": 0.9, "contes": 0.9, "wikipédia": 0.6, "lieux": 0.35}
 
 
 def fold(s: str) -> str:
@@ -103,6 +103,15 @@ class KnowledgeBase:
                     continue
                 self._add("word", row["kab"], row["fr"], row.get("source", ""), True,
                           row.get("domain", ""))
+                # Lexique du corps humain : expressions et devinettes traduites → phrases citables
+                src = f"{row.get('source', '')}, mot « {row['kab']} »"
+                for ex in row.get("expressions") or []:
+                    if ex.get("kab") and ex.get("fr"):
+                        self._add("pair", ex["kab"], ex["fr"], src, True, row.get("domain", ""))
+                for rd in row.get("riddles") or []:
+                    if rd.get("kab") and rd.get("answer"):
+                        self._add("pair", rd["kab"], f"Devinette — réponse : {rd['answer']}", src, True,
+                                  row.get("domain", ""))
         # Programme A1 d'Amusnaw : mots et blocs de chaque unité (prioritaires).
         for path in sorted(content.glob("curriculum_*.json")):
             try:
@@ -115,7 +124,7 @@ class KnowledgeBase:
                     self._add("word", w["kab"], w["fr"], src, True, "programme")
         # Textes kabyles authentiques (romans, contes, essais HCA), sans traduction :
         # exemples d'emploi réel des mots.
-        for row in _read_jsonl(d / "corpus_hca.jsonl"):
+        for row in (r for f in sorted(d.glob("corpus_*.jsonl")) for r in _read_jsonl(f)):
             self._add("text", row["kab"], "", f"{row.get('source', '')}, p. {row.get('page', '?')}", True)
         # Chansons sous licence : un vers par ligne (voir data/songs/README.md)
         for row in _read_jsonl(d / "songs" / "songs.jsonl"):
@@ -124,6 +133,34 @@ class KnowledgeBase:
                 fr += f" — Sens caché : {row['hidden_meaning']}"
             self._add("song", row["kab"], fr,
                       f"{row.get('artist', '')} — {row.get('title', '')}", True)
+        # K. Bouamara, « Apprendre le kabyle par niveaux » (CC BY-NC-ND) : cité tel quel, avec la source
+        for row in _read_jsonl(d / "bouamara_niveaux.jsonl"):
+            src = f"K. Bouamara, Apprendre le kabyle par niveaux (2026), niveau {row.get('level')}"
+            fr = row["fr"] + (f" (littéralement : {row['lit']})" if row.get("lit") else "")
+            if row.get("level") == 0:
+                self._add("word", row["kab"], row["fr"], src, True, "vocabulaire de base")
+            else:
+                self._add("pair", row["kab"], fr, src, True, "vocabulaire de base")
+        # Tatoeba : phrases d'exemple du kabyle parlé, avec traduction anglaise (CC0 / CC BY 2.0 FR)
+        for row in _read_jsonl(d / "tatoeba_exemples.jsonl"):
+            if row.get("fr"):
+                self._add("pair", row["kab"], row["fr"], "Tatoeba (tatoeba.org, CC BY 2.0 FR)", True, "tatoeba")
+            else:
+                self._add("text", row["kab"], "", f"Tatoeba — en anglais : « {row.get('en', '')} »", True)
+        # Contes kabyles timucuha (association Numidya, CC BY-NC 4.0), phrase par phrase
+        for row in _read_jsonl(d / "contes_numidya.jsonl"):
+            self._add("pair", row["kab"], row["fr"], row.get("source", "Contes Numidya"), True, "contes")
+        # Wikipédia en kabyle (CC BY-SA 4.0) : culture, histoire, géographie
+        for row in _read_jsonl(d / "wiki_kab.jsonl"):
+            self._add("text", row["kab"], "", row.get("source", "Wikipédia en kabyle"), True, "wikipédia")
+        # Noms de lieux kabyles d'OpenStreetMap (ODbL)
+        for row in _read_jsonl(d / "toponymes.jsonl"):
+            self._add("word", row["kab"], row["fr"], row.get("source", ""), True, "lieux")
+        # A. At Weḥmana, Tinfaliyin (HCA 2025) : expressions traduites, orthographe de l'auteur
+        for row in _read_jsonl(d / "tinfaliyin.jsonl"):
+            self._add("pair", row["kab"], row["fr"],
+                      f"{row.get('source', '')}, p. {row.get('page', '?')} (orthographe de l'auteur)", True,
+                      "expressions")
         for path in sorted(d.glob("parallel_*.jsonl")):
             for row in _read_jsonl(path):
                 self._add("pair", row["kab"], row["fr"], row.get("source", ""),

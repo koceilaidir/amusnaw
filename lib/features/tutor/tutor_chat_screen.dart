@@ -170,14 +170,19 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
             throw ApiException(503, ev['message'] as String? ?? '');
         }
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      // 429 : limite de messages atteinte, le serveur explique gentiment pourquoi
+      final pause = e is ApiException && e.status == 429;
       setState(() {
         if (started && reply.text.isNotEmpty) {
           reply.failed = true; // réponse coupée : on garde ce qui est arrivé
         } else {
           conv.messages.remove(reply);
-          conv.messages.add(ChatMsg('Je n’arrive pas à joindre le serveur. Vérifie ta connexion et réessaie.',
+          conv.messages.add(ChatMsg(
+              pause
+                  ? 'Tu as beaucoup écrit cette heure-ci : fais une petite pause, je t’attends ensuite.'
+                  : 'Je n’arrive pas à joindre le serveur. Vérifie ta connexion et réessaie.',
               fromTutor: true, failed: true));
         }
       });

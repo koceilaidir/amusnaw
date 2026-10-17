@@ -45,15 +45,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  bool get _testMode => kDebugMode || AppConfig.testLogin;
+  bool get _testMode => kDebugMode || kIsWeb || AppConfig.testLogin;
 
-  /// Bêta : on demande juste un prénom, sans Google ni Apple.
+  /// Sans compte : on demande juste un prénom, sans Google ni Apple (utile aussi
+  /// sur les téléphones sans services Google). Activé par --dart-define=TEST_LOGIN=true.
   Future<void> _testLogin() async {
     final ctrl = TextEditingController();
     final name = await showCupertinoDialog<String>(
       context: context,
       builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Tester sans compte'),
+        title: const Text('Continuer sans compte'),
         content: Padding(
           padding: const EdgeInsets.only(top: 12),
           child: CupertinoTextField(controller: ctrl, placeholder: 'Ton prénom', autofocus: true),
@@ -139,15 +140,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  OutlinedButton(
-                    onPressed:
-                        _busy ? null : () => _signIn(authService.signInWithGoogle),
-                    child: const Text('Continuer avec Google'),
-                  ),
+                  if (!kIsWeb) // sur le web, Google demande son propre bouton : prévu ensuite
+                    OutlinedButton(
+                      onPressed:
+                          _busy ? null : () => _signIn(authService.signInWithGoogle),
+                      child: const Text('Continuer avec Google'),
+                    ),
                   CupertinoButton(
-                    // TODO: connexion e-mail. En bêta : test sans compte.
+                    // Sans compte (prénom seulement) ; la connexion par e-mail viendra plus tard.
                     onPressed: _busy ? null : (_testMode ? _testLogin : null),
-                    child: Text(_testMode ? 'Tester sans compte' : 'Utiliser un e-mail',
+                    child: Text(_testMode ? 'Continuer sans compte' : 'Utiliser un e-mail',
                         style: TextStyle(color: p.accentText, fontSize: 17)),
                   ),
                 ],

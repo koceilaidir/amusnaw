@@ -58,6 +58,7 @@ class ReminderService {
 
   /// Demande l'autorisation (Android 13+, iOS). Renvoie false si refusée.
   Future<bool> requestPermission() async {
+    if (kIsWeb) return false;
     await init();
     final android = _plugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -72,6 +73,7 @@ class ReminderService {
   }
 
   Future<void> schedule(TimeOfDay time, String lang) async {
+    if (kIsWeb) return;
     await init();
     await _plugin.cancel(_id);
     final now = tz.TZDateTime.now(tz.local);
@@ -100,6 +102,7 @@ class ReminderService {
   }
 
   Future<void> cancel() async {
+    if (kIsWeb) return;
     await init();
     await _plugin.cancel(_id);
   }

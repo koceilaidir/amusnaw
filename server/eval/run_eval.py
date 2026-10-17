@@ -29,7 +29,7 @@ def norm(s: str) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("base_url")
-    ap.add_argument("--out", default="rapport_eval.md")
+    ap.add_argument("--out", default="/tmp/rapport_eval.md")
     ap.add_argument("--questions", default=str(Path(__file__).with_name("questions.jsonl")))
     a = ap.parse_args()
     qs = [json.loads(l) for l in open(a.questions, encoding="utf-8") if l.strip()]

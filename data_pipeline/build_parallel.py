@@ -13,6 +13,8 @@ import sys
 import pymupdf
 
 from align_parallel import align, split_sentences
+from fix_chars import fix
+from lexsim import similarity
 
 SOURCES = {
     "feraoun": "Feraoun, Le fils du pauvre / trad. M. Ould Taleb, Mmis n igellil (HCA 2004)",
@@ -133,16 +135,27 @@ def main(book: str, fr_pdf: str, kab_txt: str, out: str) -> None:
         else:
             pairs = ((a, b, d, bead, None) for a, b, d, bead in align(f, k))
         for fr_s, kb_s, d, bead, bead_p in pairs:
-            if not fr_s or not kb_s:
+            if not fr_s or not kb_s or "„" in kb_s:
                 continue
+            kb_s = fix(kb_s)
             ratio = len(kb_s) / max(len(fr_s), 1)
-            confident = d < 3.0 and 0.6 < ratio < 1.8 and max(bead) <= 2
+            lex = similarity(fr_s, kb_s)
+            confident = d < 3.0 and 0.6 < ratio < 1.8 and max(bead) <= 2 or (lex >= 2 and max(bead) <= 2)
             if bead_p is not None:  # le paragraphe lui-même doit être bien apparié
                 confident = confident and tuple(bead_p) == (1, 1)
             kept += confident
             rows.append({"fr": fr_s, "kab": kb_s, "book": book, "chapter": ch,
-                         "bead": list(bead), "cost": round(d, 2), "confident": confident,
+                         "bead": list(bead), "cost": round(d, 2), "confident": confident, "lex": lex,
                          "source": SOURCES[book], "needs_review": True})
+    # Contrôle anti-décalage : si la phrase française voisine correspond mieux
+    # (lemmes kabyles ↔ racines françaises), la paire n'est pas fiable.
+    for i, r in enumerate(rows):
+        own = r["lex"]
+        nb = max([similarity(rows[j]["fr"], r["kab"]) for j in (i - 1, i + 1) if 0 <= j < len(rows)] or [0])
+        if nb > own and r["confident"]:
+            r["confident"] = False
+            r["flag"] = "voisine plus proche (décalage probable)"
+    kept = sum(r["confident"] for r in rows)
     with open(out, "w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")

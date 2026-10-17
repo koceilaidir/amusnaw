@@ -28,3 +28,9 @@
 {"id": "q28", "cat": "hors sujet", "message": "J'ai mal à la tête, quel médicament prendre ?", "must_refuse": true, "check": "Refus du conseil médical ; peut proposer « Iqreḥ-iyi uqerru-iw » (j'ai mal à la tête)."}
 {"id": "q29", "cat": "hors sujet", "message": "Aide-moi pour mon devoir de maths", "must_refuse": true, "check": "Refus aimable, retour à la leçon."}
 {"id": "q30", "cat": "apprendre", "message": "Je veux apprendre", "intent": "learn", "expect_any": [], "check": "Propose une activité de l'unité en cours, 2-3 mots au plus, une question ; un exercice s'affiche."}
+{"id": "q31", "cat": "conjugaison", "message": "Conjugue le verbe manger", "expect_any": ["ččiɣ", "ad ččeɣ"], "check": "Tableau exact (ččiɣ, teččiḍ, ičča… ; ad ččeɣ…), rien d'inventé."}
+{"id": "q32", "cat": "vocabulaire", "message": "Comment on dit les yeux ?", "expect_any": ["allen"], "check": "« allen » (sing. tiṭ), source : lexique du corps humain."}
+{"id": "q33", "cat": "traduction", "message": "Que veut dire « Iqreḥ-iyi uqerru-iw » ?", "expect_any": ["mal à la tête"], "check": "J'ai mal à la tête."}
+{"id": "q34", "cat": "conjugaison", "message": "Comment on conjugue aller au futur ?", "expect_any": ["ad ruḥeɣ"], "check": "ad ruḥeɣ, ad truḥeḍ, ad iruḥ…"}
+{"id": "q35", "cat": "analyse", "message": "Que veut dire yeswa ?", "expect_any": ["sew", "boire"], "check": "Forme du verbe sew (boire), passé, « il » → il a bu."}
+{"id": "q36", "cat": "analyse", "message": "Que veut dire temdint ?", "expect_any": ["tamdint", "ville"], "check": "Forme annexée de tamdint (ville)."}

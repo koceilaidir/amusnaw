@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -76,6 +77,7 @@ class SettingsScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (!kIsWeb) // pas de notification programmée dans un navigateur
                     CupertinoListSection.insetGrouped(
                       backgroundColor: p.bg,
                       header: const Text('RAPPEL QUOTIDIEN'),

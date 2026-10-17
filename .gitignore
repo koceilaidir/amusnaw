@@ -13,3 +13,11 @@ data/*
 !data/songs/
 data/songs/*
 !data/songs/README.md
+
+# Clé de signature Android : ne jamais publier
+android/key.properties
+*.jks
+*.keystore
+
+# Site web construit (flutter build web), copié sur le VPS à part
+server/web/

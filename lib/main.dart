@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,8 +14,18 @@ import 'features/tutor/tutor_chat_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'theme/app_theme.dart';
 
+/// Plein écran : barre d'état (en haut) et barre de navigation (en bas)
+/// cachées. Un glissement depuis le bord les fait réapparaître un instant.
+void _fullscreen() => SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+// Android réaffiche parfois les barres au retour dans l'app : on les recache.
+// ignore: unused_element
+late final AppLifecycleListener _lifecycle;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  _fullscreen();
+  _lifecycle = AppLifecycleListener(onResume: _fullscreen);
   await initializeDateFormatting(); // dates dans la langue du prof
   final prefs = await SharedPreferences.getInstance();
   localeController.load(prefs);

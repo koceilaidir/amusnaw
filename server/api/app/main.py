@@ -4,8 +4,8 @@ from contextlib import asynccontextmanager
 from datetime import timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
-from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,16 +13,22 @@ from sqlalchemy.orm import Session
 from . import tutor
 from .auth import current_user, issue_token, upsert_user, verify_apple, verify_google
 from .config import get_settings
+from .limits import chat_limit, signup_limit
 from .db import (ChatMessage, LearnedWord, LearnerProfile, Review, SessionLocal, User, get_db,
                  init_db, now)
 from .knowledge import kb
-from . import content, learning
+from . import content, learning, router
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()  # TODO: passer à Alembic pour les migrations
     kb.load(get_settings().data_dir, get_settings().content_dir)
+    try:  # analyse des formes conjuguées / annexées (yeswa → sew, uqerru → aqerru)
+        from .morph import Lemmatizer
+        router.MORPH = Lemmatizer.load(get_settings().data_dir, get_settings().content_dir)
+    except Exception as e:  # noqa: BLE001 — l'app marche sans
+        print(f"[morph] non chargé : {e}", flush=True)
     with SessionLocal() as db:  # réapplique les décisions du linguiste
         for r in db.scalars(select(Review)):
             kb.apply_review(r.item_id, r.status, r.kab, r.fr)
@@ -82,10 +88,12 @@ def login_apple(body: AppleLogin, db: Session = Depends(get_db)):
 
 
 @app.post("/auth/dev")
-def login_dev(body: DevLogin, db: Session = Depends(get_db)):
-    """Connexion de test (DEV_LOGIN=true) : un compte par téléphone, sans Google/Apple."""
+def login_dev(body: DevLogin, request: Request, db: Session = Depends(get_db)):
+    """Connexion sans compte (DEV_LOGIN=true) : un compte par appareil, sans Google/Apple."""
     if not get_settings().dev_login:
         raise HTTPException(404)
+    ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "?").split(",")[0]
+    signup_limit.check(ip)
     user = upsert_user(db, provider="dev", sub=body.device_id, email=None,
                        name=body.name, language=body.interface_language)
     return _session(user)
@@ -142,7 +150,11 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session):
     # 1. L'élève a-t-il réemployé des mots découverts un jour précédent ?
     newly_learned = learning.check_reused(db, user.id, body.message, tz)
     if tutor.is_obviously_off_topic(body.message):
-        return profile, newly_learned, None, None
+        return profile, newly_learned, None, None, None
+    # 2. Réponse exacte écrite par le serveur (vocabulaire, conjugaison, hors sujet évident)
+    direct = router.direct_reply(body.message, user.interface_language)
+    if direct:
+        return profile, newly_learned, None, None, direct
     recent = db.scalars(
         select(ChatMessage).where(ChatMessage.user_id == user.id)
         .order_by(ChatMessage.created_at.desc()).limit(12)
@@ -163,11 +175,11 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session):
     system = tutor.build_system_prompt(
         user, profile, days_away=days_away,
         session_plan=plan,
-        references=kb.references_for(context),
+        references="\n".join(x for x in (kb.references_for(context), router.verb_hints(body.message)) if x),
         words_to_reuse=learning.words_to_reuse(db, user.id, tz),
     )
     system += INTENT_HINTS.get(body.intent or "", "")
-    return profile, newly_learned, system, history
+    return profile, newly_learned, system, history, None
 
 
 def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
@@ -204,7 +216,10 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
 
 @app.post("/tutor/chat")
 async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    profile, newly, system, history = _prepare_turn(body, user, db)
+    chat_limit.check(str(user.id))
+    profile, newly, system, history, direct = _prepare_turn(body, user, db)
+    if direct:
+        return _finish_turn(db, user, profile, body.message, direct, False, newly, body.intent, direct)
     if system is None:
         reply = tutor.off_topic_reply(user.interface_language)
         return _finish_turn(db, user, profile, body.message, reply, True, newly)
@@ -217,17 +232,24 @@ async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = D
 
 @app.post("/tutor/chat/stream")
 async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    chat_limit.check(str(user.id))
     """Même chose que /tutor/chat, mais la réponse arrive mot par mot (SSE) :
       data: {"type": "delta", "text": "…"}      (plusieurs fois)
       data: {"type": "done", "reply": …, "off_topic": …, "learned": {…}}
       data: {"type": "error", "message": …}
     """
-    profile, newly, system, history = _prepare_turn(body, user, db)
+    profile, newly, system, history, direct = _prepare_turn(body, user, db)
 
     def event(obj: dict) -> str:
         return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
 
     async def gen():
+        if direct:
+            shown, _ = content.strip_markers(direct)
+            yield event({"type": "delta", "text": shown})
+            yield event({"type": "done", **_finish_turn(db, user, profile, body.message, direct, False, newly,
+                                                         body.intent, direct)})
+            return
         if system is None:
             reply = tutor.off_topic_reply(user.interface_language)
             yield event({"type": "delta", "text": reply})
@@ -293,7 +315,11 @@ def content_capsules():
 
 @app.get("/privacy")
 def privacy_page():
-    return FileResponse(Path(__file__).parent / "static" / "privacy.html")
+    html = (Path(__file__).parent / "static" / "privacy.html").read_text("utf-8")
+    email = get_settings().contact_email.strip()
+    if email:
+        html = html.replace("[ADRESSE E-MAIL DE CONTACT]", f'<a href="mailto:{email}">{email}</a>')
+    return HTMLResponse(html)
 
 
 @app.get("/me/progress")

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     review_token: str = ""
     # Connexion de test sans Google/Apple (à laisser à false en production).
     dev_login: bool = False
+    # Adresse de contact affichée dans la politique de confidentialité (/privacy)
+    contact_email: str = ""
 
     @property
     def google_audiences(self) -> list[str]:

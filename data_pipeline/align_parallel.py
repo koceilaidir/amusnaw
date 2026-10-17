@@ -14,6 +14,8 @@ Usage :
 
 import json
 import math
+
+from lexsim import similarity
 import re
 import sys
 import unicodedata
@@ -123,6 +125,8 @@ def align(fr: list[str], kab: list[str]):
                     a1 = set().union(*an_fr[i:ii])
                     a2 = set().union(*an_kb[j:jj])
                     d -= 1.5 * len(a1 & a2)
+                    # mots du dictionnaire présents des deux côtés (base enrichie)
+                    d -= 1.2 * min(similarity(' '.join(fr[i:ii]), ' '.join(kab[j:jj])), 6)
                     d += 1.0 * len(a1 ^ a2)
                 else:
                     d = -math.log(p) + 0.01 * (l1 + l2)

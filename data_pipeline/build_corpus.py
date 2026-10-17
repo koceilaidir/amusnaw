@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pymupdf
 
+from fix_chars import fix
 from kabyle_fonts import convert_span
 
 # Livres exclus : autres variétés (touareg, mozabite, chaoui, Ouargla, Blida),
@@ -25,6 +26,8 @@ EXCLUDE = (
     "Adlisfus", "tumzabt", "Wewras", "Wawras", "wawras", "At-Wargren", "tacawit", "Techelhit",
     "Aselmed-n-tantaliwin", "AMAWAL", "Amawal", "LEXIQUE", "RECUEIL", "ASEGZAWAL",
     "ACTES", "Actes", "Royaumes", "2011/02-livre", "patronymes",
+    # seconde passe : chaoui (Aurès), touareg, arabe, et livres traités à part
+    "Tirmeggut", "Adu-n-UnZul", "Inhiten", "2025/14-livre", "tinfosen", "Tinfaliyin", "ASEGZAWAL",
 )
 
 KAB_WORDS = set("""
@@ -93,7 +96,9 @@ def main(root: str, out_path: str, freq_path: str) -> None:
         kept = 0
         for i, page in enumerate(doc):
             for s in SENT.split(page_text(page)):
-                s = s.strip(" -–—")
+                s = fix(s.strip(" -–—"))
+                if "„" in s:
+                    continue
                 key = re.sub(r"\W+", "", s.lower())
                 if key in seen or not is_kabyle(s):
                     continue

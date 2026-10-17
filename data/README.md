@@ -19,6 +19,14 @@ Les livres sources sont des publications du HCA, utilisées **avec l'autorisatio
 | `lexicon_prenoms.jsonl` | M. A. Haddadou, *Recueil de prénoms amazighs* (HCA 2003) — 1 117 prénoms et leur sens | sujet « prénoms amazighs » |
 | `lexicon_juridique.jsonl` | M. Z. Benramdane, *Amawal azerfan* (2013) et *Amawal n tutlayt tazerfant* (2021) — 7 784 termes | dictionnaire (poids réduit dans la recherche) |
 | `phrases_juridiques.jsonl` | Les 26 545 longues expressions des mêmes lexiques | non chargé par le prof ; réservé à l'entraînement |
+| `lexicon_corps_humain.jsonl` | M. A. Haddadou, *Lexique kabyle du corps humain* (HCA 2003), transcrit depuis le scan — 87 entrées (66 noms, 21 verbes), 595 expressions (421 traduites), 22 devinettes. Champ `unsure` : lectures douteuses (ɣ/y surtout) | dictionnaire, phrases citables, unité « Le corps » |
+| `bouamara_niveaux.jsonl` | K. Bouamara, *Lmed taqbaylit s yiswiren – Apprendre le kabyle par niveaux* (HAL hal-05580987, 2026, **CC BY-NC-ND 4.0**) — 1 009 entrées kabyle / français / anglais, niveaux 0 (mots) à 5 (expert), traduction littérale (`lit`) quand elle existe. Vérifié par l'auteur | citations du prof (avec la source), vocabulaire de base. **Licence ND + NC : cité tel quel, jamais modifié, app non commerciale, pas d'entraînement de modèle** |
+| `lexicon_rhetorique.jsonl` | K. Bouamara, *Amawal n tunuɣin n tesnukyest – Lexique de la rhétorique* (HCA 2007) — 83 termes | dictionnaire (langue et didactique) |
+| `corpus_rhetorique.jsonl` | Le même livre : 279 phrases kabyles de l'essai | exemples d'emploi |
+| `tinfaliyin.jsonl` | A. At Weḥmana, *Tinfaliyin n Tmaziɣt-Taqbaylit* (HCA 2025) — 5 818 expressions kabyles avec traduction française. **Orthographe de l'auteur** (préfixes séparés : « I nna-yas ») : citées comme telles | expressions, sens des mots |
+| `lexicon_tinfaliyin.jsonl` | Le même livre : 1 541 mots d'entrée et leurs sens | dictionnaire |
+| `lexicon_glossaires_livres.jsonl` | Glossaires de fin de livre : *Abane Ramdane*, *Llawel*, *Inagan*, *Imseɣret aɣelnaw*, *Akeččum ɣer tefyirmant*, *Tizizwit d tamemt* (apiculture) — 492 mots | dictionnaire |
+| `corpus_poesie.jsonl` | 3 742 strophes de 7 recueils (*Inagan*, *Llawel*, *Iḥulfan d izuffan*, *Amsebrid*, *Teyzi n yiles*, *Tiɣri n Umesdrar*, *Ayen i d-nnan ger yetran*), découpées par strophe | poésie, exemples d'emploi |
 | `corpus_hca.jsonl` | 45 673 phrases kabyles authentiques tirées de 43 livres HCA (romans, contes, poésie, essais, histoire) | exemples d'emploi réel, fréquence des mots, pré-entraînement |
 | `word_freq.tsv` | Fréquence de chaque forme kabyle dans ce corpus | choix du vocabulaire courant, vérification des mots du programme |
 
@@ -51,7 +59,55 @@ python parse_amawal_tatrart.py ; python parse_amawal_akal.py ; python parse_dida
 python parse_prenoms.py ; python parse_juridique.py
 ```
 
+## Ressources libres ajoutées (oct. 2026) — `data/externes/` → `import_*.py`
+
+| Source (Hugging Face) | Licence | Fichiers d'origine → `data/externes/` | Ce qu'on en tire |
+|---|---|---|---|
+| `taqbaylit/kabyle-verbs` (tables issues du conjugueur **amyag.com**) | CC BY 4.0 déclarée | `train-0000{0,1,2}-of-00003.parquet` → `verbes_tables_{0,1,2}.parquet` ; formes : `train-0000{0..5}-of-00006.parquet` → `verbes_formes_{0..5}.parquet` | **6 198 verbes** avec sens français et conjugaison complète (`import_verbs.py`) ; croisés forme par forme avec nos règles (aoriste 98-100 % d'accord) ; Bouamara reste la référence pour ses verbes. **Provenance amyag.com à signaler au HCA.** |
+| `taqbaylit/tatoeba-en-kab` (Tatoeba) | CC0 / CC BY 2.0 FR | `train-00000-of-00001.parquet`, `dev-00000-of-00001.parquet` → `tatoeba_en_kab_{train,dev}.parquet` | 204 941 phrases kabyles (preuves d'usage des verbes, `tatoeba_kab.jsonl`), 60 000 exemples citables (`tatoeba_exemples.jsonl`), **3 693 sens anglais appris** (`learn_english.py`, ≈ 95 % justes à la relecture) |
+| `taqbaylit/kabyle-english-TM` (logiciels libres) | CC BY 4.0 | `kab_en_translation_memory.parquet` → `memoire_traduction_en_kab.parquet` | **29 977 termes modernes** kabyle ↔ anglais (`termes_modernes_en.jsonl`) |
+| `agbalu/KabLex` | CC BY 4.0 / MIT | `train (1).jsonl` → `kablex_lexicon.jsonl`, `train.jsonl` → `kablex_prononciations.jsonl` | lexique de mathématiques Tafsut : **3 668 termes** (`lexicon_maths.jsonl`) |
+| `boffire/hunspell-kab` (correcteur, M. Belkacem) | MIT | `kab.dic`, `kab.aff` | **21 810 mots** avec nature et mot de base (pluriels, féminins) → lemmatiseur (`hunspell_kab.jsonl`) |
+
+**Bilan** : 6 269 verbes conjugués ; **89,3 % des mots du corpus HCA reconnus** (77,5 % avant ces ressources) ; phrases décalées des livres traduits 6,4 % (Camus), 10,5 % (Feraoun), 1,8 % (Petit Prince) ; test caché 82 % (strict).
+
+## Quatrième passe : ressources kabyle ↔ français (17 oct. 2026) — `import_ressources_libres.py`
+
+| Source | Licence | Fichier d'origine → `data/externes/` | Ce qu'on en tire |
+|---|---|---|---|
+| Tatoeba kabyle-français | CC BY 2.0 FR | `fr_kab_tifinagh.tsv` → `tatoeba_fr_kab_tifinagh.tsv` ; `Sentence pairs in Kabyle-French - 2023-07-18.tsv` → `tatoeba_kab_fr_2023.tsv` ; `en_kab_tifinagh.tsv` → `tatoeba_en_kab_tifinagh.tsv` | **225 983 paires kabyle-français** (`tatoeba_fr.jsonl`) : apprentissage des sens **français** et exemples traduits en français |
+| Tatoeba, toutes les phrases kabyles | CC BY 2.0 FR | `kab_tifinagh.tsv` → `tatoeba_kab_tifinagh.tsv` | 758 143 phrases (`tatoeba_kab_tout.jsonl`) : preuves d'usage |
+| Contes *timucuha* (association Numidya) | CC BY-NC 4.0 (anglais traduit par machine) | `train (2).jsonl`, `validation.jsonl` → `contes_numidya_{train,val}.jsonl` | 917 phrases kabyle-français (`contes_numidya.jsonl`) |
+| Toponymes OpenStreetMap | ODbL (© contributeurs OSM) | `train-00000-of-00001 (2).parquet` → `toponymes_osm.parquet` | 5 344 noms de lieux kabyles (villes, villages, daïras, reliefs ; rues et commerces écartés) → `toponymes.jsonl` |
+| Wikipédia en kabyle | CC BY-SA 4.0 | `WIKABV1.zip` → `wikab_v1.zip` ; `kabwiki_*.txt.gz` → `kabwiki/` | 5 594 articles, 12 357 passages gardés s'ils sont bien en kabyle (≥ 70 % de mots reconnus) → `wiki_kab.jsonl` |
+| Common Voice (Mozilla), phrases kabyles | CC0 | dépôt GitHub `common-voice/server/data/kab/*.txt` → `commonvoice_kab/` | 168 341 phrases (`commonvoice_kab.jsonl`) : preuves d'usage |
+| kabyle-corpus (`data.csv`) | MIT, origine inconnue, bruité | `data.csv` → `corpus_kabyle_data.csv` | seulement les 311 240 phrases dont tous les mots sont reconnus (`attestation_kab.jsonl`) : fréquences et preuves d'usage, **jamais citées** |
+| Entités nommées kabyle-anglais | non précisée | `kabyle_named_entities.tsv` | 292 entités (`entites_nommees_en.jsonl`), en réserve |
+
+**Écartés** : traductions du Coran et de la Bible (sensibles, droits des traductions), paires « minées » NLLB (trop bruitées), téléchargements incomplets (`.crdownload`).
+
+**Bilan** : 6 346 verbes ; **90,3 % des mots du corpus HCA reconnus** (89,3 % avant) ; 270 600 formes connues, 18 022 lemmes avec un sens français ; **3 221 traductions apprises** (≈ 320 avant), test caché 74 % strict, ≈ 90 % à la relecture ; les sens appris ne sont jamais préférés à un sens HCA : ils apparaissent en « autres sens » ou en dernier recours.
+
+## Troisième passe : lemmatiseur et apprentissage (oct. 2026)
+
+Tout se reconstruit avec `data_pipeline/rebuild_all.sh <livres> <pdf isolés>`.
+
+- **Lemmatiseur** (`lemmatize.py`, copie serveur `server/api/app/morph.py`) : ramène chaque forme à son lemme sans rien inventer — mots-outils (`function_words.json`), verbes conjugués par les règles de Bouamara (+ variante « ye- », participes), noms à l'état libre / annexé / pluriels listés, pronoms collés, noms propres (majuscule > 80 %).
+- **Verbes courants** (`core_verbs.json` → `validate_core_verbs.py`) : ili, ẓer, bɣu, zmer, sɛu, ṭṭef… gardés seulement si le corpus atteste leurs formes ; un aspect sans preuve est retiré.
+- **Autres variantes exclues du corpus kabyle** : *Tirmeǧǧut* et *Aḍu n Unẓul* (chaoui), *Inhiten d tinẓuren n imuhaɣ* et *tinfosen nanr* (touareg), livret en arabe.
+- **Alignement des livres traduits par lemmes** (`lexsim.py`, `build_parallel.py`) et contrôle anti-décalage (`audit_parallel.py`).
+- **Verbes découverts** (`discover_verbs.py`) : formes inconnues vues après « ad » → lemme possible → conjugaison complète par les règles → gardé si le corpus atteste ses formes (aoriste ≥ 3, prétérit ≥ 2, total ≥ 8). Variantes et doublons écartés (même squelette consonantique et même place des voyelles). Sens rattachés ensuite : apprentissage, nom verbal de Tinfaliyin (modèle régulier), ou même mot dans un lexique HCA ; sinon « sens non encore relevé ».
+- **Apprentissage** (`learn_lexicon.py` → `lexicon_appris.jsonl`, domaine `appris`, poids faible, à valider) : liaison compétitive lemme kabyle ↔ racine française sur les paires fiables ; au moins 3 paires et Dice ≥ 0,3 (≥ 0,6 pour les mots de 3 lettres). Précision mesurée par test caché (20 % des mots connus masqués puis retrouvés) : 74 % en comparaison automatique stricte, ≈ 93 % à la relecture (la plupart des « erreurs » sont des erreurs de la référence ou des synonymes).
+
+**Bilan de la reconstruction complète** : 41 387 phrases kabyles + 3 742 strophes ; 271 verbes conjugués (35 Bouamara, 8 ajoutés, 42 courants attestés, 53 des lexiques, 133 découverts dont 34 avec un sens) ; 359 traductions apprises ; livres traduits : phrases décalées 7,6 % (Camus), 11,5 % (Feraoun), 2,1 % (Petit Prince), 2 611 paires fiables ; **77,5 % des mots du corpus reconnus** (lemme + analyse), contre 65,6 % au début de cette passe. Le corpus de Bouamara (licence ND) n'est pas utilisé pour apprendre.
+
 ## Points connus
 
+- **Seconde passe (oct. 2026)** : `fix_chars.py` corrige les restes d'anciennes polices ($ → ɣ, £ → Ɣ, ɤ → ɣ, є → ɛ, Σ → Ɛ, << >> → « », caractères invisibles) : ~2 600 phrases réparées ; les 67 phrases contenant « „ » (u ou y selon le livre, ambigu) sont retirées. Les corpus parallèles ont été réalignés avec le dictionnaire (`lexsim.py`) : phrases décalées (la voisine correspond mieux) passées de 24 % à 15 % pour Feraoun, 13 % à 11 % pour Camus ; les paires restantes douteuses sont marquées `confident: false` et ne sont jamais citées.
+
 - Les livres HCA utilisent d'anciennes polices (« Tira », « Tayma »…) : `kabyle_fonts.py` lit la police de chaque morceau de texte et rétablit ɣ, ḍ, ṭ, ẓ, ṛ, ṣ, ḥ, ɛ, ǧ, č. Quelques mots peuvent rester mal convertis.
-- Le *Lexique kabyle du corps humain* (Haddadou, HCA 2003) est un scan : il faut un OCR puis une relecture lourde. Mieux vaut obtenir la version Word d'origine auprès du HCA.
+- Le *Lexique kabyle du corps humain* a été transcrit à la main depuis le scan : dans la police italique, ɣ et y se ressemblent. Les mots douteux sont listés dans le champ `unsure` de chaque entrée : à relire en priorité.
+- Conjugaison : `server/content/verbs.json` (92 verbes : 35 tirés des tableaux de Bouamara, 8 ajoutés à la main, 49 trouvés dans les lexiques HCA par `data_pipeline/expand_verbs.py` et gardés seulement si le corpus atteste leurs formes — preuves dans le champ `attested`) + règles de K. Bouamara (HAL hal-05647626, 2026, CC BY-NC-SA 4.0) dans `server/api/app/conjugation.py`, testées sur les 180 formes de ses tableaux. Les verbes marqués `source: amusnaw` sont à faire valider.
+- Le corpus par niveaux est un tableau à 3 colonnes : `parse_bouamara_niveaux.py` regroupe les lignes par rangée (pas « en miroir » ligne à ligne), recolle les entrées coupées par un saut de page et retrouve exactement les 1 009 entrées annoncées. Contrôle : sur 99 mots communs avec les lexiques HCA, les écarts restants sont des synonymes.
+- Fiches de grammaire : `server/content/grammar_notes.json` (12 fiches rédigées pour Amusnaw, exemples tirés de la base) ; *Ilugan n tira n tmaziɣt* (éd. Iman-nneɣ, droits réservés) a servi de référence, sans en reprendre le texte.
+- Non intégrés (droits non couverts par l'autorisation du HCA) : Dallet, *Dictionnaire kabyle-français* (SELAF 1982), mémoires de master de l'UMMTO et de l'UQAM, article de Ben Mohamed (*Expressions maghrébines*, 2016).

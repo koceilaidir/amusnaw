@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../auth/auth_service.dart';
 import '../config.dart';
+import 'stream_client_io.dart' if (dart.library.js_interop) 'stream_client_web.dart';
 
 class ApiException implements Exception {
   ApiException(this.status, this.message);
@@ -52,7 +53,7 @@ class ApiClient {
   /// Réponse en continu (Server-Sent Events) : chaque événement `data: {...}`
   /// est renvoyé dès qu'il arrive.
   Stream<Map<String, dynamic>> stream(String path, Map<String, dynamic> body) async* {
-    final client = http.Client();
+    final client = streamingClient(); // navigateur : fetch, qui lit la réponse au fil de l'eau
     try {
       final req = http.Request('POST', Uri.parse('${AppConfig.apiBaseUrl}$path'))
         ..headers.addAll(await _headers())

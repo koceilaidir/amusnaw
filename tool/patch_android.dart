@@ -5,10 +5,15 @@
 //   notifications (Android 13+), redémarrage du téléphone (rappel conservé) ;
 // - récepteurs de flutter_local_notifications ;
 // - ouverture des liens https (url_launcher, page de confidentialité) ;
-// - « core library desugaring » exigé par flutter_local_notifications.
+// - « core library desugaring » exigé par flutter_local_notifications ;
+// - identifiant de l'app « com.amusnaw.app » (celui déclaré chez Google) ;
+// - signature de la version finale avec la clé décrite dans android/key.properties
+//   (voir docs/PUBLIER_ANDROID.md) ; sans ce fichier, la clé de debug reste utilisée.
 //
 // Le script peut être relancé sans risque : il ne modifie que ce qui manque.
 import 'dart:io';
+
+const appId = 'com.amusnaw.app';
 
 void main() {
   _patchManifest(File('android/app/src/main/AndroidManifest.xml'));
@@ -101,6 +106,60 @@ void _patchGradle(File f, {required bool kotlin}) {
   }
   if (!s.contains('desugar_jdk_libs')) {
     s = '${s.trimRight()}\n\ndependencies {\n    $dep\n}\n';
+  }
+
+  // Identifiant de l'app (le « namespace » du code Kotlin ne change pas)
+  s = s.replaceFirst(RegExp(r'applicationId\s*=?\s*"[^"]*"'),
+      kotlin ? 'applicationId = "$appId"' : 'applicationId "$appId"');
+
+  // Signature de la version finale
+  if (!s.contains('key.properties')) {
+    if (kotlin) {
+      s = '''import java.io.FileInputStream
+import java.util.Properties
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+$s''';
+      s = s.replaceFirst(RegExp(r'android\s*\{'), '''android {
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }''');
+      s = s.replaceFirst('signingConfig = signingConfigs.getByName("debug")',
+          'signingConfig = if (keystorePropertiesFile.exists()) signingConfigs.getByName("release") '
+          'else signingConfigs.getByName("debug")');
+    } else {
+      s = s.replaceFirst(RegExp(r'android\s*\{'), '''def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+            }
+        }
+    }''');
+      s = s.replaceFirst('signingConfig signingConfigs.debug',
+          'signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug');
+    }
   }
   if (s != before) {
     f.writeAsStringSync(s);

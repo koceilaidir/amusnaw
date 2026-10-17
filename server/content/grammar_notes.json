@@ -1,0 +1,168 @@
+{
+ "source": "Fiches rédigées pour Amusnaw d'après la grammaire courante du kabyle et les règles d'orthographe usuelles (K. Bouamara et al., Ilugan n tira n tmaziɣt ; K. Bouamara, Apprendre le kabyle par niveaux, 2026). Exemples tirés des livres HCA de la base. À faire valider.",
+ "notes": [
+  {
+   "id": "annexion",
+   "title": "L'état d'annexion (aqerru → uqerru)",
+   "triggers": [
+    "annexion",
+    "aqerru.*uqerru",
+    "uqerru",
+    "devient u",
+    "change.*(voyelle|a en u|début)",
+    "tamurt.*tmurt",
+    "teqbaylit",
+    "pourquoi .*\\bu[a-zɛɣḍṭẓṛṣḥ]+.*au lieu"
+   ],
+   "text": "Un nom kabyle a deux formes. La forme « libre » (aqerru, tamurt, amdan) et la forme « annexée », où le début change : a- devient u- ou we- (aqerru → uqerru, amdan → wemdan), i- devient yi-, ta- devient t(e)- (tamurt → tmurt, taqbaylit → teqbaylit). On met la forme annexée après la plupart des prépositions (n, deg, ɣer, ɣef, s, i…), après un nombre, et quand le sujet vient après le verbe. Exemples : « Iqreḥ-iyi uqerru-iw » (j'ai mal à la tête : le sujet aqerru vient après le verbe) ; « Amawal n teqbaylit » (le lexique du kabyle : après n).",
+   "question": "À toi : comment dirais-tu « de la montagne » si montagne se dit « adrar » ? (Indice : après n, a- devient u-.)"
+  },
+  {
+   "id": "genre-2e",
+   "title": "Parler à un homme ou à une femme (fell-ak / fell-am)",
+   "triggers": [
+    "fell-ak",
+    "fell-am",
+    "-ak\\b.*-am\\b",
+    "-ik\\b.*-im\\b",
+    "homme.*femme",
+    "masculin.*féminin",
+    "\\bkečč\\b.*\\bkemm\\b"
+   ],
+   "text": "En kabyle, « tu » et « toi » changent selon qu'on parle à un homme ou à une femme. On ajoute -k pour un homme et -m pour une femme : « Azul fell-ak » (bonjour, à un homme), « Azul fell-am » (à une femme) ; « isem-ik » (ton nom, homme), « isem-im » (ton nom, femme) ; « kečč » (toi, homme), « kemm » (toi, femme). Les verbes, eux, gardent la même forme : « Amek telliḍ ? » se dit aux deux.",
+   "question": "À toi : comment salues-tu ta sœur ?"
+  },
+  {
+   "id": "possessifs",
+   "title": "Mon, ton, son… (isem-iw, isem-ik)",
+   "triggers": [
+    "possessif",
+    "\\bmon\\b.*\\bton\\b",
+    "-iw\\b",
+    "-is\\b",
+    "isem-iw",
+    "comment dire mon",
+    "yemma-s",
+    "baba-s"
+   ],
+   "text": "Le possessif se colle derrière le nom avec un trait d'union : -iw (mon, ma), -ik / -im (ton, ta : homme / femme), -is (son, sa), -nneɣ (notre), -nwen / -nkent (votre), -nsen / -nsent (leur). Exemple : « isem-iw » (mon nom), « isem-is » (son nom). Avec les mots de la famille, on emploie souvent -s pour « son, sa » : « yemma-s » (sa mère), « baba-s » (son père).",
+   "question": "À toi : comment dis-tu « mon nom est… » ?"
+  },
+  {
+   "id": "trait-union",
+   "title": "Pourquoi tous ces traits d'union ?",
+   "triggers": [
+    "trait d'union",
+    "tiret",
+    "pourquoi.*-iyi",
+    "efk-iyi-d",
+    "yenna-yas",
+    "\\b-d\\b.*(veut dire|sert)",
+    "particule d"
+   ],
+   "text": "Le kabyle colle au verbe, avec des traits d'union, les petits mots qui l'accompagnent : les pronoms (-iyi « moi », -as « à lui / à elle », -t « le ») et la particule -d qui indique un mouvement vers celui qui parle. Ainsi « efk-iyi-d aman » veut dire « donne-moi de l'eau » : efk (donne) + iyi (moi) + d (vers ici). Les pronoms se collent aussi aux prépositions : « fell-ak » (sur toi), « ɣur-s » (chez lui).",
+   "question": "Tu veux qu'on décompose une autre phrase ensemble ?"
+  },
+  {
+   "id": "negation",
+   "title": "La négation ur … ara",
+   "triggers": [
+    "négation",
+    "negation",
+    "\\bne\\b.*\\bpas\\b.*(comment|dire)",
+    "ur .* ara",
+    "dire non",
+    "nier"
+   ],
+   "text": "Pour dire « ne … pas », on encadre le verbe : « ur » devant, « ara » après. Au passé, le verbe prend souvent une forme spéciale (prétérit négatif) : « ččiɣ » (j'ai mangé) → « ur ččiɣ ara » ; « uriɣ » (j'ai écrit) → « ur uriɣ ara » (même forme). Demande-moi « conjugue … » pour voir la forme négative exacte d'un verbe.",
+   "question": "À toi : essaie « je ne sais pas » avec issin (savoir) : ur … ara."
+  },
+  {
+   "id": "futur",
+   "title": "Le futur avec ad",
+   "triggers": [
+    "futur",
+    "\\bad\\b.*(veut dire|sert|c'est quoi)",
+    "dire demain",
+    "je vais"
+   ],
+   "text": "Pour parler de ce qui va se passer, on met « ad » devant le verbe à l'aoriste : « ad ruḥeɣ » (je vais partir / je partirai), « ad naru » (nous écrirons). « ad » s'écrit séparé du verbe. Pour voir toutes les personnes, demande-moi « conjugue ruḥ ».",
+   "question": "À toi : comment dirais-tu « je vais manger » ? (manger : ečč → ad ččeɣ)"
+  },
+  {
+   "id": "predication-d",
+   "title": "« d » : c'est…",
+   "triggers": [
+    "\\bd\\b (aqcic|nekk|taqcict)",
+    "c'est un",
+    "dire c'est",
+    "particule de prédication",
+    "pourquoi d "
+   ],
+   "text": "Pour dire « c'est … », le kabyle utilise le petit mot « d » devant le nom, sans verbe : « d nekk » (c'est moi), « d aqcic » (c'est un garçon). Attention : ce « d » est différent du « d » qui veut dire « et / avec » et du « -d » collé au verbe (vers ici).",
+   "question": "À toi : comment dirais-tu « c'est moi » ?"
+  },
+  {
+   "id": "feminin",
+   "title": "Masculin et féminin des noms (aqcic / taqcict)",
+   "triggers": [
+    "féminin",
+    "feminin",
+    "masculin",
+    "taqcict",
+    "ta.*t\\b.*(pourquoi|féminin)"
+   ],
+   "text": "La plupart des noms masculins commencent par a-, i- ou u-. Le féminin se forme souvent en encadrant le mot par t… t : « aqcic » (garçon) → « taqcict » (fille), « amcic » (chat) → « tamcict » (chatte). Beaucoup de noms féminins ont donc la forme ta…t.",
+   "question": "À toi : si « amɣar » veut dire « vieil homme », que penses-tu que veut dire « tamɣart » ?"
+  },
+  {
+   "id": "pluriel",
+   "title": "Le pluriel (afus → ifassen)",
+   "triggers": [
+    "pluriel",
+    "plusieurs",
+    "ifassen",
+    "au pluriel"
+   ],
+   "text": "Au pluriel, le a- du début devient en général i- (et ta- devient ti-). Ensuite, soit on ajoute une fin (-en, -an, -in), soit l'intérieur du mot change : « axxam » → « ixxamen » (maisons), « afus » → « ifassen » (mains), « taqcict » → « tiqcicin » (filles), « tabburt » → « tibbura » (portes). Le pluriel de chaque mot s'apprend avec le mot.",
+   "question": "Tu veux qu'on révise les pluriels des parties du corps ?"
+  },
+  {
+   "id": "lettres",
+   "title": "Les lettres spéciales (ɣ, ɛ, ḍ, č…)",
+   "triggers": [
+    "prononc",
+    "alphabet",
+    "lettres? (spéciale|kabyle|bizarre)",
+    "comment (on )?(lit|prononce)",
+    "point (sous|souscrit)",
+    "que veut dire le point"
+   ],
+   "text": "L'alphabet kabyle en lettres latines a quelques lettres spéciales : ɣ se prononce comme le r grasseyé français (aɣrum, le pain) ; ɛ est le « ع » de l'arabe ; č se dit « tch » et ǧ « dj » ; x se dit comme la jota espagnole ; q est un k prononcé au fond de la gorge. Les lettres avec un point dessous (ḍ, ṭ, ẓ, ṛ, ṣ) sont « emphatiques », prononcées plus lourdes ; ḥ est le « ح » de l'arabe. Le point change le sens : « izi » (mouche) n'est pas « iẓi » (vésicule).",
+   "question": "À toi : essaie de lire à voix haute « aɣrum » et « tanemmirt »."
+  },
+  {
+   "id": "ordre",
+   "title": "L'ordre des mots (verbe d'abord)",
+   "triggers": [
+    "ordre des mots",
+    "sujet",
+    "verbe (en premier|d'abord|avant)",
+    "construction de (la )?phrase"
+   ],
+   "text": "En kabyle, la phrase commence souvent par le verbe ; le sujet vient après et se met alors à l'état d'annexion : « Yenna-yas umeɣbun… » (le pauvre lui dit…, de ameɣbun). On peut aussi mettre le sujet en tête pour insister.",
+   "question": "Tu veux voir l'état d'annexion plus en détail ?"
+  },
+  {
+   "id": "tellid",
+   "title": "Azul ! Petite correction",
+   "triggers": [
+    "\\btellid\\b",
+    "d ou ḍ",
+    "ḍ ou d"
+   ],
+   "text": "On écrit « Amek telliḍ ? » (comment vas-tu ?) avec ḍ, un d emphatique : c'est la marque du « tu » au passé (-ḍ), comme dans « teččiḍ » (tu as mangé). Pour répondre : « Labas, tanemmirt » (ça va, merci).",
+   "question": "À toi : réécris la phrase avec le bon ḍ, puis dis-moi comment tu vas."
+  }
+ ]
+}
