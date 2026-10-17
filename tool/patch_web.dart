@@ -28,6 +28,21 @@ void main() {
   if (!s.contains('name="theme-color"')) {
     s = s.replaceFirst('</head>', '  <meta name="theme-color" content="$olive">\n</head>');
   }
+  // Icônes : logo Amusnaw (fichiers web/favicon.* et web/icons/* fournis avec le projet)
+  s = s.replaceFirst(RegExp(r'<link rel="apple-touch-icon"[^>]*>'),
+      '<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">');
+  if (!s.contains('favicon.ico')) {
+    s = s.replaceFirst(RegExp(r'<link rel="icon"[^>]*>'),
+        '<link rel="icon" href="favicon.ico" sizes="any">\n  <link rel="icon" type="image/png" href="favicon.png">');
+  }
+  // Écran de chargement : fond olivier et étoile blanche, comme au lancement de l'app
+  if (!s.contains('amusnaw-splash')) {
+    s = s.replaceFirst('</head>', '''  <style id="amusnaw-splash">
+    html, body { margin: 0; height: 100%; }
+    body { background: $olive url("icons/splash-mark.png") no-repeat center / 112px auto; }
+  </style>
+</head>''');
+  }
   index.writeAsStringSync(s);
   stdout.writeln('✓ ${index.path}');
 
