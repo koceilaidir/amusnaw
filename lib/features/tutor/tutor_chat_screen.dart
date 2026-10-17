@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../content/sample_content.dart';
 import '../../core/api/api_client.dart';
@@ -52,6 +53,8 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   static const _topics = ['Une chanson kabyle', 'Yennayer', 'Le village', 'Les prénoms amazighs'];
 
   final _scaffold = GlobalKey<ScaffoldState>();
+  // Ordinateur : menu de gauche ouvert ou rangé (retenu d'une visite à l'autre)
+  bool _menuOpen = true;
   final _input = TextEditingController();
   // Le clavier ne s'ouvre que si l'élève touche le champ de saisie.
   final _inputFocus = FocusNode();
@@ -75,6 +78,14 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     _input.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) => _dropFocus());
     _syncProgress();
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted) setState(() => _menuOpen = prefs.getBool('menu_open') ?? true);
+    });
+  }
+
+  void _toggleMenu() {
+    setState(() => _menuOpen = !_menuOpen);
+    SharedPreferences.getInstance().then((prefs) => prefs.setBool('menu_open', _menuOpen));
   }
 
   @override
@@ -175,6 +186,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       if (!mounted) return;
       // 429 : limite de messages atteinte, le serveur explique gentiment pourquoi
       final pause = e is ApiException && e.status == 429;
+      final slow = e is ApiException && e.status == 503; // serveur joint, mais le modèle n'a pas répondu
       setState(() {
         if (started && reply.text.isNotEmpty) {
           reply.failed = true; // réponse coupée : on garde ce qui est arrivé
@@ -183,7 +195,9 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
           conv.messages.add(ChatMsg(
               pause
                   ? 'Tu as beaucoup écrit cette heure-ci : fais une petite pause, je t’attends ensuite.'
-                  : 'Je n’arrive pas à joindre le serveur. Vérifie ta connexion et réessaie.',
+                  : slow
+                      ? 'Je suis très demandé en ce moment et je n’ai pas pu terminer ma réponse. Réessaie dans un instant.'
+                      : 'Je n’arrive pas à joindre le serveur. Vérifie ta connexion et réessaie.',
               fromTutor: true, failed: true));
         }
       });
@@ -330,7 +344,20 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       onDrawerChanged: (_) => WidgetsBinding.instance.addPostFrameCallback((_) => _dropFocus()),
       drawer: wide ? null : menu,
       body: Row(children: [
-        if (wide) menu, // grand écran : menu toujours visible à gauche
+        if (wide) // grand écran : menu à gauche, qu'on peut ranger
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            width: _menuOpen ? 288 : 0,
+            child: ClipRect(
+              child: OverflowBox(
+                alignment: Alignment.centerLeft,
+                minWidth: 288,
+                maxWidth: 288,
+                child: menu,
+              ),
+            ),
+          ),
         Expanded(child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -349,7 +376,11 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     if (wide)
-                      const SizedBox(width: 44)
+                      RoundIconButton(
+                        label: _menuOpen ? 'Ranger le menu' : 'Afficher le menu',
+                        icon: Icon(CupertinoIcons.sidebar_left, size: 20, color: p.text),
+                        onPressed: _toggleMenu,
+                      )
                     else
                       RoundIconButton(
                         label: 'Menu',
@@ -359,7 +390,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                           _scaffold.currentState?.openDrawer();
                         },
                       ),
-                    if (wide) // le logo est déjà dans le menu de gauche
+                    if (wide && _menuOpen) // le logo est déjà dans le menu de gauche
                       Flexible(
                         child: Text(empty ? '' : _conv.title,
                             maxLines: 1,
@@ -1021,13 +1052,7 @@ class _AppDrawer extends StatelessWidget {
                     child: GestureDetector(
                       onTap: () {
                         close();
-                        Navigator.of(context, rootNavigator: true)
-                            .push(CupertinoPageRoute(
-                                builder: (ctx) => isWide(ctx)
-                                    ? ColoredBox(
-                                        color: AppPalette.of(ctx).bg,
-                                        child: const ReadingWidth(maxWidth: 820, child: SettingsScreen()))
-                                    : const SettingsScreen()));
+                        openSettings(context); // page sur téléphone, fenêtre centrée sur ordinateur
                       },
                       child: Container(
                         width: 44,

@@ -70,15 +70,78 @@ def build_system_prompt(user: User, profile: LearnerProfile, *, days_away: int,
     return body.strip()
 
 
+# Les références (mots, phrases) changent à chaque question : on les joint au
+# dernier message plutôt qu'au prompt système. Le début de la conversation
+# (consignes + historique) reste identique d'un tour à l'autre, et Ollama le
+# garde en mémoire au lieu de tout relire : la réponse commence bien plus vite.
+REFS_MARK = "\n<<<REFERENCES>>>\n"
+REFS_NOTE = "Elles sont jointes au dernier message de l'élève, sous « RÉFÉRENCES VALIDÉES »."
+HISTORY_TURNS = 8        # messages gardés (4 échanges)
+HISTORY_CHARS = 600      # un long message est raccourci
+MAX_REPLY_TOKENS = 380   # réponse courte : plus rapide, et plus pédagogique
+
+
+def _messages(system: str, history: list[dict], message: str) -> list[dict]:
+    system, _, refs = system.partition(REFS_MARK)
+    hist = [{"role": m["role"], "content": m["content"][:HISTORY_CHARS]} for m in history[-HISTORY_TURNS:]]
+    last = message if not refs.strip() else (
+        f"{message}\n\n---\nRÉFÉRENCES VALIDÉES pour cette réponse (ta seule source de kabyle) :\n{refs}")
+    return [{"role": "system", "content": system}, *hist, {"role": "user", "content": last}]
+
+
+def _ollama_url() -> str | None:
+    """Adresse native d'Ollama (…:11434), qui accepte keep_alive et num_ctx."""
+    base = get_settings().llm_base_url.rstrip("/")
+    return base[:-3] if base.endswith("/v1") and ":11434" in base else None
+
+
+OLLAMA_OPTIONS = {"temperature": 0.4, "num_ctx": 4096, "num_predict": MAX_REPLY_TOKENS}
+
+
+async def warm_up() -> None:
+    """Charge le modèle en mémoire au démarrage et l'y garde (pas d'attente au 1er message)."""
+    url = _ollama_url()
+    if not url:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=10)) as client:
+            await client.post(f"{url}/api/generate", json={"model": get_settings().llm_model, "prompt": "Azul",
+                                                            "keep_alive": -1, "options": {"num_predict": 1}})
+        print("[llm] modèle chargé et gardé en mémoire", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"[llm] préchauffage impossible : {e}", flush=True)
+
+
 async def stream_model(system: str, history: list[dict], message: str):
-    """Génère la réponse morceau par morceau (format SSE compatible OpenAI)."""
+    """Génère la réponse morceau par morceau."""
     s = get_settings()
-    messages = [{"role": "system", "content": system}, *history, {"role": "user", "content": message}]
+    messages = _messages(system, history, message)
+    url = _ollama_url()
     async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=10)) as client:
-        async with client.stream(
+        if url:  # Ollama : API native (modèle gardé en mémoire, contexte réglé)
+            async with client.stream("POST", f"{url}/api/chat", json={
+                "model": s.llm_model, "messages": messages, "stream": True,
+                "keep_alive": -1, "options": OLLAMA_OPTIONS,
+            }) as r:
+                r.raise_for_status()
+                async for line in r.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except ValueError:
+                        continue
+                    delta = (obj.get("message") or {}).get("content")
+                    if delta:
+                        yield delta
+                    if obj.get("done"):
+                        break
+            return
+        async with client.stream(  # tout serveur compatible OpenAI (vLLM, API…)
             "POST", f"{s.llm_base_url}/chat/completions",
             headers={"Authorization": f"Bearer {s.llm_api_key}"},
-            json={"model": s.llm_model, "messages": messages, "temperature": 0.4, "stream": True},
+            json={"model": s.llm_model, "messages": messages, "temperature": 0.4, "stream": True,
+                  "max_tokens": MAX_REPLY_TOKENS},
         ) as r:
             r.raise_for_status()
             async for line in r.aiter_lines():
@@ -96,13 +159,5 @@ async def stream_model(system: str, history: list[dict], message: str):
 
 
 async def ask_model(system: str, history: list[dict], message: str) -> str:
-    s = get_settings()
-    messages = [{"role": "system", "content": system}, *history, {"role": "user", "content": message}]
-    async with httpx.AsyncClient(timeout=120) as client:
-        r = await client.post(
-            f"{s.llm_base_url}/chat/completions",
-            headers={"Authorization": f"Bearer {s.llm_api_key}"},
-            json={"model": s.llm_model, "messages": messages, "temperature": 0.4},
-        )
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"].strip()
+    parts = [p async for p in stream_model(system, history, message)]
+    return "".join(parts).strip()

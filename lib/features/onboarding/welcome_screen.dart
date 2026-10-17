@@ -21,6 +21,77 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
   bool _busy = false;
+  bool _emailOn = false; // le serveur peut envoyer des codes par e-mail (Brevo)
+
+  @override
+  void initState() {
+    super.initState();
+    authService.methods().then((m) {
+      if (mounted && m['email'] == true) setState(() => _emailOn = true);
+    });
+  }
+
+  /// Petite fenêtre avec un ou deux champs ; renvoie les valeurs, ou null si annulé.
+  Future<List<String>?> _ask(String title, String? message, List<(String, TextInputType)> fields,
+      {String action = 'Continuer'}) {
+    final ctrls = [for (final _ in fields) TextEditingController()];
+    return showCupertinoDialog<List<String>>(
+      context: context,
+      builder: (ctx) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Column(children: [
+          if (message != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(message)),
+          for (var i = 0; i < fields.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: CupertinoTextField(
+                controller: ctrls[i],
+                placeholder: fields[i].$1,
+                keyboardType: fields[i].$2,
+                autofocus: i == 0,
+                autocorrect: false,
+              ),
+            ),
+        ]),
+        actions: [
+          CupertinoDialogAction(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(ctx, [for (final c in ctrls) c.text.trim()]),
+            child: Text(action),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Connexion par e-mail : adresse (+ prénom), puis code à 6 chiffres reçu par e-mail.
+  Future<void> _emailLogin() async {
+    final first = await _ask('Continuer avec un e-mail', 'On t’envoie un code à 6 chiffres.', [
+      ('Ton adresse e-mail', TextInputType.emailAddress),
+      ('Ton prénom (première fois)', TextInputType.name),
+    ], action: 'Recevoir le code');
+    if (first == null || first[0].isEmpty) return;
+    final email = first[0], name = first[1];
+    setState(() => _busy = true);
+    try {
+      await authService.sendEmailCode(email);
+    } on AuthException catch (e) {
+      _toast(e.message);
+      return;
+    } catch (_) {
+      _toast('Serveur injoignable. Vérifie ta connexion et réessaie.');
+      return;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    if (!mounted) return;
+    final code = await _ask('Ton code', 'Envoyé à $email. Regarde aussi dans les spams.', [
+      ('Code à 6 chiffres', TextInputType.number),
+    ], action: 'Se connecter');
+    if (code == null || code[0].isEmpty) return;
+    await _signIn(() => authService.signInWithEmailCode(email, code[0], name: name));
+  }
 
   bool get _isIOS =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
@@ -101,13 +172,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             _busy ? null : () => _signIn(authService.signInWithGoogle),
         child: const Text('Continuer avec Google'),
       ),
+    if (_emailOn) ...[
+      OutlinedButton(
+        onPressed: _busy ? null : _emailLogin,
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+        child: const Text('Continuer avec un e-mail'),
+      ),
+      const SizedBox(height: 12),
+    ],
     if (kIsWeb) // sur le site, c'est l'entrée principale : vrai bouton
       FilledButton(
         onPressed: _busy ? null : _testLogin,
         style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
         child: const Text('Commencer sans compte'),
       )
-    else
+    else if (_testMode || !_emailOn)
     CupertinoButton(
       // Sans compte (prénom seulement) ; la connexion par e-mail viendra plus tard.
       onPressed: _busy ? null : (_testMode ? _testLogin : null),

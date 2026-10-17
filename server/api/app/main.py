@@ -17,7 +17,10 @@ from .limits import chat_limit, signup_limit
 from .db import (ChatMessage, LearnedWord, LearnerProfile, Review, SessionLocal, User, get_db,
                  init_db, now)
 from .knowledge import kb
-from . import content, learning, router
+from . import content, email_login, learning, router
+
+
+_BACKGROUND: set = set()  # tâches de fond gardées en vie
 
 
 @asynccontextmanager
@@ -32,6 +35,8 @@ async def lifespan(_: FastAPI):
     with SessionLocal() as db:  # réapplique les décisions du linguiste
         for r in db.scalars(select(Review)):
             kb.apply_review(r.item_id, r.status, r.kab, r.fr)
+    import asyncio
+    _BACKGROUND.add(asyncio.get_running_loop().create_task(tutor.warm_up()))  # charge le modèle sans bloquer
     yield
 
 
@@ -92,10 +97,48 @@ def login_dev(body: DevLogin, request: Request, db: Session = Depends(get_db)):
     """Connexion sans compte (DEV_LOGIN=true) : un compte par appareil, sans Google/Apple."""
     if not get_settings().dev_login:
         raise HTTPException(404)
-    ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "?").split(",")[0]
-    signup_limit.check(ip)
+    signup_limit.check(_ip(request))
     user = upsert_user(db, provider="dev", sub=body.device_id, email=None,
                        name=body.name, language=body.interface_language)
+    return _session(user)
+
+
+class EmailStart(BaseModel):
+    email: str = Field(min_length=5, max_length=200)
+    interface_language: str = "fr"
+
+
+class EmailVerify(BaseModel):
+    email: str = Field(min_length=5, max_length=200)
+    code: str = Field(min_length=6, max_length=6)
+    name: str | None = Field(default=None, max_length=60)
+    interface_language: str = "fr"
+
+
+def _ip(request: Request) -> str:
+    return request.headers.get("x-forwarded-for", request.client.host if request.client else "?").split(",")[0]
+
+
+@app.get("/auth/methods")
+def auth_methods():
+    """Ce que l'app peut proposer à l'accueil."""
+    s = get_settings()
+    return {"email": email_login.enabled(), "guest": s.dev_login, "google": bool(s.google_audiences)}
+
+
+@app.post("/auth/email/start")
+async def email_start(body: EmailStart, request: Request):
+    """Envoie un code à 6 chiffres par e-mail (Brevo)."""
+    await email_login.start(body.email, _ip(request), body.interface_language)
+    return {"sent": True}
+
+
+@app.post("/auth/email/verify")
+def email_verify(body: EmailVerify, db: Session = Depends(get_db)):
+    """Vérifie le code : crée le compte au premier passage, puis connecte."""
+    email = email_login.verify(body.email, body.code)
+    user = upsert_user(db, provider="email", sub=email, email=email,
+                       name=(body.name or "").strip() or None, language=body.interface_language)
     return _session(user)
 
 
@@ -175,10 +218,13 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session):
     system = tutor.build_system_prompt(
         user, profile, days_away=days_away,
         session_plan=plan,
-        references="\n".join(x for x in (kb.references_for(context), router.verb_hints(body.message)) if x),
+        references=tutor.REFS_NOTE,
         words_to_reuse=learning.words_to_reuse(db, user.id, tz),
     )
     system += INTENT_HINTS.get(body.intent or "", "")
+    refs = "\n".join(x for x in (kb.references_for(context), router.verb_hints(body.message)) if x)
+    if refs:  # jointes au dernier message (voir tutor._messages)
+        system += tutor.REFS_MARK + refs
     return profile, newly_learned, system, history, None
 
 
@@ -255,6 +301,7 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
             yield event({"type": "delta", "text": reply})
             yield event({"type": "done", **_finish_turn(db, user, profile, body.message, reply, True, newly)})
             return
+        yield ": le prof réfléchit\n\n"  # commentaire SSE : la connexion est ouverte tout de suite
         parts: list[str] = []
         sent = 0  # caractères déjà envoyés ; on n'envoie jamais une balise [[…]]
         try:
@@ -268,7 +315,8 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
                 if len(safe) > sent:
                     yield event({"type": "delta", "text": safe[sent:]})
                     sent = len(safe)
-        except Exception:
+        except Exception as e:  # noqa: BLE001
+            print(f"[llm] échec : {type(e).__name__}: {e}", flush=True)
             yield event({"type": "error", "message": "Tutor is unavailable, try again shortly."})
             return
         reply = "".join(parts).strip()

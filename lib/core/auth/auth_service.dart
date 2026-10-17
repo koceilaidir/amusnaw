@@ -79,9 +79,7 @@ class AuthService {
         'interface_language': localeController.value.code,
       }),
     );
-    if (res.statusCode != 200) {
-      throw AuthException('Sign-in failed (${res.statusCode}).');
-    }
+    if (res.statusCode != 200) throw AuthException(_detail(res, 'Connexion impossible (${res.statusCode}).'));
     final json = jsonDecode(res.body) as Map<String, dynamic>;
     final session = AuthSession(
       token: json['access_token'] as String,
@@ -91,6 +89,44 @@ class AuthService {
     await _storage.write(key: 'access_token', value: session.token);
     return session;
   }
+
+  /// Message d'erreur du serveur (« Code incorrect. »…), sinon le message par défaut.
+  String _detail(http.Response res, String fallback) {
+    try {
+      final d = (jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>)['detail'];
+      if (d is String && d.isNotEmpty) return d;
+    } catch (_) {}
+    return fallback;
+  }
+
+  /// Ce que le serveur propose à l'accueil : {"email": bool, "guest": bool, "google": bool}.
+  Future<Map<String, dynamic>> methods() async {
+    try {
+      final res = await http
+          .get(Uri.parse('${AppConfig.apiBaseUrl}/auth/methods'))
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {}
+    return const {};
+  }
+
+  /// Connexion par e-mail, étape 1 : le serveur envoie un code à 6 chiffres.
+  Future<void> sendEmailCode(String email) async {
+    final res = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/email/start'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'interface_language': localeController.value.code}),
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) throw AuthException(_detail(res, 'L’e-mail n’a pas pu être envoyé.'));
+  }
+
+  /// Étape 2 : le code reçu. Le compte est créé au premier passage.
+  Future<AuthSession> signInWithEmailCode(String email, String code, {String? name}) =>
+      _exchange('/auth/email/verify', {
+        'email': email,
+        'code': code,
+        if (name != null && name.isNotEmpty) 'name': name,
+      });
 
   Future<String?> currentToken() => _storage.read(key: 'access_token');
 

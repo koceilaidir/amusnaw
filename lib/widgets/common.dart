@@ -98,13 +98,22 @@ class PrimaryButton extends StatelessWidget {
 
 /// Barre de navigation iOS aux couleurs de l'app.
 CupertinoSliverNavigationBar largeTitleBar(BuildContext context, String title,
-    {Widget? trailing}) {
+    {Widget? trailing, bool closeButton = false}) {
   final p = AppPalette.of(context);
   return CupertinoSliverNavigationBar(
     largeTitle: Text(title, style: TextStyle(color: p.text)),
     backgroundColor: p.bg.withValues(alpha: .92),
     border: null,
-    trailing: trailing,
+    automaticallyImplyLeading: !closeButton,
+    // dans une fenêtre (ordinateur) : une croix pour fermer, pas de « retour »
+    trailing: closeButton
+        ? CupertinoButton(
+            padding: EdgeInsets.zero,
+            minSize: 36,
+            onPressed: () => Navigator.of(context).pop(),
+            child: Icon(CupertinoIcons.xmark, size: 20, color: p.text2),
+          )
+        : trailing,
   );
 }
 

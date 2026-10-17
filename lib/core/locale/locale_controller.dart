@@ -32,7 +32,8 @@ class LocaleController extends ValueNotifier<TutorLanguage> {
     final deviceCode = PlatformDispatcher.instance.locale.languageCode;
     return supportedTutorLanguages.firstWhere(
       (l) => l.code == deviceCode,
-      orElse: () => supportedTutorLanguages.first,
+      // langue non proposée (chinois, kabyle…) : le français, langue de l'interface
+      orElse: () => supportedTutorLanguages.firstWhere((l) => l.code == 'fr'),
     );
   }
 

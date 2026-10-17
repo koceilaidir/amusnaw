@@ -14,10 +14,39 @@ import '../../theme/app_theme.dart';
 import '../../theme/mark.dart';
 import '../../widgets/common.dart';
 
+/// Ouvre les réglages : page entière sur téléphone, fenêtre centrée au-dessus
+/// de la conversation sur ordinateur (comme sur Claude).
+Future<void> openSettings(BuildContext context) {
+  if (!isWide(context)) {
+    return Navigator.of(context, rootNavigator: true)
+        .push(CupertinoPageRoute(builder: (_) => const SettingsScreen()));
+  }
+  final size = MediaQuery.sizeOf(context);
+  return showDialog<void>(
+    context: context,
+    useRootNavigator: true,
+    barrierColor: const Color(0x73000000),
+    builder: (ctx) => Dialog(
+      backgroundColor: AppPalette.of(ctx).bg,
+      insetPadding: const EdgeInsets.all(32),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: SizedBox(
+        width: 680,
+        height: (size.height * .86).clamp(420.0, 820.0),
+        child: const SettingsScreen(inDialog: true),
+      ),
+    ),
+  );
+}
+
 /// Réglages : langue du prof, apparence, rappel quotidien, confidentialité,
 /// déconnexion et suppression du compte.
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.inDialog = false});
+
+  /// Affiché dans une fenêtre centrée (ordinateur) plutôt qu'en page entière.
+  final bool inDialog;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +62,7 @@ class SettingsScreen extends StatelessWidget {
             final name = learnerStore.value.name;
             return CustomScrollView(
               slivers: [
-                largeTitleBar(context, 'Réglages'),
+                largeTitleBar(context, 'Réglages', closeButton: inDialog),
                 SliverToBoxAdapter(
                   child: Column(children: [
                     const SizedBox(height: 8),

@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     dev_login: bool = False
     # Adresse de contact affichée dans la politique de confidentialité (/privacy)
     contact_email: str = ""
+    # Connexion par e-mail (code à 6 chiffres envoyé par Brevo)
+    brevo_api_key: str = ""
+    mail_from: str = ""            # ex. bonjour@amusnaw.dz (domaine validé chez Brevo)
+    mail_from_name: str = "Amusnaw"
 
     @property
     def google_audiences(self) -> list[str]:
