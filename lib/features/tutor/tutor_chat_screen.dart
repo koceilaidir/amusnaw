@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +17,7 @@ import '../../core/learning/review.dart';
 import '../../core/locale/locale_controller.dart';
 import '../../core/settings/app_settings.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/filigree.dart';
 import '../../widgets/common.dart';
 import '../../theme/mark.dart';
 import '../../widgets/content_cards.dart';
@@ -162,6 +166,43 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     _scrollToEnd();
     final reply = ChatMsg('', fromTutor: true);
     var started = false;
+    // Affichage mot par mot, régulier : le texte reçu s'ajoute à une réserve,
+    // qu'une minuterie révèle doucement (plus vite si la réserve grossit).
+    var pending = '';
+    var streamDone = false;
+    Timer? reveal;
+    void tick() {
+      if (!mounted || pending.isEmpty) return;
+      final words = (pending.length / 80).ceil().clamp(1, 5);
+      var cut = 0;
+      for (var i = 0; i < words; i++) {
+        final m = RegExp(r'^\s*\S+\s?').firstMatch(pending.substring(cut));
+        if (m == null) break;
+        final end = cut + m.end;
+        // pendant la réception, on n'affiche pas un mot peut-être encore incomplet
+        if (!streamDone && end >= pending.length && !RegExp(r'\s$').hasMatch(pending)) break;
+        cut = end;
+      }
+      if (cut == 0) return;
+      setState(() {
+        if (!started) {
+          conv.messages.add(reply);
+          started = true;
+        }
+        reply.text += pending.substring(0, cut);
+        pending = pending.substring(cut);
+      });
+      _scrollToEnd(animate: false);
+    }
+
+    Future<void> drain() async {
+      streamDone = true;
+      while (pending.isNotEmpty && mounted) {
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      }
+      reveal?.cancel();
+    }
+
     try {
       await for (final ev in api.stream('/tutor/chat/stream', {
         'message': text,
@@ -178,15 +219,10 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         if (!mounted) return;
         switch (ev['type']) {
           case 'delta':
-            setState(() {
-              if (!started) {
-                conv.messages.add(reply);
-                started = true;
-              }
-              reply.text += ev['text'] as String;
-            });
-            _scrollToEnd(animate: false);
+            pending += ev['text'] as String;
+            reveal ??= Timer.periodic(const Duration(milliseconds: 32), (_) => tick());
           case 'done':
+            await drain(); // on finit d'écrire avant d'afficher les cartes
             learnerStore.recordChat();
             final learned = (ev['learned'] as Map?) ?? const {};
             final newWords = ((learned['new'] as List?) ?? const []).cast<String>();
@@ -219,6 +255,8 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         }
       }
     } catch (e) {
+      reveal?.cancel();
+      if (pending.isNotEmpty) reply.text += pending;
       if (!mounted) return;
       // 429 : limite de messages atteinte, le serveur explique gentiment pourquoi
       final pause = e is ApiException && e.status == 429;
@@ -238,6 +276,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         }
       });
     } finally {
+      reveal?.cancel();
       if (mounted) setState(() => _sending = false);
       _scrollToEnd();
     }
@@ -371,7 +410,14 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
             stops: const [0, .4],
           ),
         ),
-        child: SafeArea(
+        child: Stack(children: [
+          // Filigrane : la plaine à l'accueil du chat, la brume pendant la conversation
+          if (empty)
+            Aquarelle(Fond.plaine, opacity: .4,
+                height: (MediaQuery.sizeOf(context).width * .5625).clamp(220.0, 460.0))
+          else
+            const Aquarelle(Fond.brume, opacity: .35),
+          SafeArea(
           child: Column(
             children: [
               Padding(
@@ -445,6 +491,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
             ],
           ),
         ),
+        ]),
       )),
       ]),
     );
@@ -609,11 +656,10 @@ class _MessageList extends StatelessWidget {
         for (final m in messages)
           Padding(padding: const EdgeInsets.only(bottom: 14), child: _Message(m)),
         if (typing)
-          Row(children: [
-            AmusnawMark(size: 18, color: p.text2),
-            const SizedBox(width: 8),
-            Text('Amusnaw écrit…', style: TextStyle(fontSize: 14, color: p.text2)),
-          ]),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Semantics(label: 'Amusnaw écrit', child: _ThinkingMark(color: p.accent)),
+          ),
       ],
     ),
     );
@@ -1135,4 +1181,44 @@ class _AppDrawer extends StatelessWidget {
       child: content,
     );
   }
+}
+
+
+/// Pendant que le prof réfléchit : l'étoile d'Amusnaw tourne et respire doucement.
+class _ThinkingMark extends StatefulWidget {
+  const _ThinkingMark({required this.color});
+  final Color color;
+
+  @override
+  State<_ThinkingMark> createState() => _ThinkingMarkState();
+}
+
+class _ThinkingMarkState extends State<_ThinkingMark> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (context, child) {
+          final t = _c.value;
+          // un tour complet, ralenti au milieu, avec une respiration (taille et opacité)
+          final turn = Curves.easeInOutCubic.transform(t);
+          final pulse = 0.5 + 0.5 * math.sin(t * 2 * math.pi);
+          return Opacity(
+            opacity: 0.55 + 0.45 * pulse,
+            child: Transform.scale(
+              scale: 0.9 + 0.12 * pulse,
+              child: Transform.rotate(angle: turn * math.pi * 2, child: child),
+            ),
+          );
+        },
+        child: AmusnawMark(size: 26, color: widget.color),
+      );
 }

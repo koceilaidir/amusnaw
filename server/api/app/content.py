@@ -294,6 +294,31 @@ def _everyday_items() -> list[Item]:
     return [it for it in _word_items() if it.domain in EVERYDAY and " " not in it.kab.strip()]
 
 
+def _programme_exercise(words: list[str], rng: random.Random) -> dict | None:
+    """Exercice sur un mot du programme A1, avec des réponses possibles tirées de
+    la même unité et des unités précédentes (des mots que l'élève a croisés)."""
+    units = _curriculum().get("units", [])
+    for w in words:
+        key = fold(w).strip(" !?.")
+        for i, u in enumerate(units):
+            hit = next((x for x in u["words"] if fold(x["kab"]) == key), None)
+            if not hit:
+                continue
+            near = [x for x in u["words"] if x is not hit]
+            before = [x for v in units[:i] for x in v["words"]]
+            rng.shuffle(before)
+            pool = [Item(id=f"prog-{x['kab']}", kind="word", kab=x["kab"], fr=x["fr"], source="Programme")
+                    for x in [hit, *near, *before]]
+            if len(pool) < 3:
+                pool += [Item(id=f"prog-{x['kab']}", kind="word", kab=x["kab"], fr=x["fr"], source="Programme")
+                         for v in units[i + 1:i + 2] for x in v["words"]]
+            if len(pool) >= 3:
+                # distracteurs pris en priorité dans la même unité
+                target = pool[0]
+                return word_exercise(target, pool[1:4] + [target], rng)
+    return None
+
+
 def build_blocks(reply: str, markers: list[tuple[str, str]], seed: str) -> list[dict]:
     blocks: list[dict] = []
     rng = random.Random(seed)
@@ -304,7 +329,14 @@ def build_blocks(reply: str, markers: list[tuple[str, str]], seed: str) -> list[
                 blocks.append({"type": "word", "kab": it.kab, "fr": _clean_fr(it.fr),
                                "tifinagh": to_tifinagh(it.kab), "source": it.source})
         elif kind in ("EXERCICE", "EXERCISE"):
-            # Mot de la réponse présent dans le lexique, sinon un mot au hasard
+            # 1. Un mot du programme (désigné, ou cité dans la réponse) : l'exercice reste
+            #    dans ce que l'élève a déjà vu — mêmes unités, rien qui tombe du ciel.
+            ex = _programme_exercise([arg] if arg else list(kb.kabyle_words(reply).values()) +
+                                     re.findall(r"«\s?([^»]+?)\s?»", reply), rng)
+            if ex:
+                blocks.append({"type": "exercise", **ex})
+                continue
+            # 2. Sinon : mot de la réponse présent dans le lexique, sinon un mot au hasard
             pool = _everyday_items()
             prog = [it for it in pool if it.domain == "programme"] or pool
             mentioned = [it for k in kb.kabyle_words(reply) if (it := _find_word(k)) and it.domain in EVERYDAY]

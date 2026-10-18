@@ -28,6 +28,17 @@ flutter build web --release --no-web-resources-cdn --dart-define=API_BASE_URL=ht
 scp -r build\web root@5.39.119.109:/opt/amusnaw/server/
 ```
 
+## 1b. Google Cloud (à mettre à jour avec le domaine)
+
+Console Google Cloud → projet Amusnaw :
+- **Identifiants → ID client « Application Web » → Origines JavaScript autorisées** : ajoute `https://amusnaw.com` (garde l'ancienne adresse sslip.io le temps de la transition).
+- **Google Auth Platform → Branding** :
+  - Logo : `assets/icon/amusnaw-logo-120.png` (120 × 120). Ajouter un logo déclenche une vérification par Google (quelques jours).
+  - Page d'accueil : `https://amusnaw.com`
+  - Règles de confidentialité : `https://amusnaw.com/privacy`
+  - Domaines autorisés : `amusnaw.com`
+- Puis reconstruis le site avec `API_BASE_URL=https://amusnaw.com` (même ID client Google).
+
 ## 2. Brevo
 
 1. Crée un compte sur brevo.com. L'offre gratuite permet 300 e-mails par jour.

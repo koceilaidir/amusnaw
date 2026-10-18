@@ -11,6 +11,7 @@ import '../../core/config.dart';
 import '../../core/learning/learner_store.dart';
 import '../../core/locale/locale_controller.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/filigree.dart';
 import '../../theme/mark.dart';
 import '../../widgets/common.dart';
 import '../tutor/tutor_chat_screen.dart';
@@ -221,6 +222,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           flex: 5,
           child: Container(
             color: const Color(0xFF56662E),
+            child: Stack(children: [
+              Padding(
             padding: const EdgeInsets.all(56),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
@@ -243,12 +246,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   style: TextStyle(fontSize: 14, color: Color(0x99F8F6F1))),
             ]),
           ),
+            ]),
+          ),
         ),
         Expanded(
           flex: 4,
           child: ColoredBox(
             color: p.bg,
-            child: Center(
+            child: Stack(children: [
+              // la vallée, en entier, calée en bas
+              const Aquarelle(Fond.vallee, opacity: .45, fit: BoxFit.fitWidth),
+              Center(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(40),
                 child: ConstrainedBox(
@@ -266,6 +274,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
               ),
             ),
+            ]),
           ),
         ),
       ]);
@@ -286,6 +295,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         ),
         child: Stack(
         children: [
+          const Aquarelle(Fond.olivier, opacity: .5, height: 300, alignment: Alignment(-.25, 1)),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),

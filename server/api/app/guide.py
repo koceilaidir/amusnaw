@@ -82,7 +82,9 @@ def step(seen: set[str], user_id: str = "", name: str = "") -> tuple[str, dict[s
             f"Ton tour : écris-moi « {chunk['kab'].rstrip(' !?.')} », ou tente l'exercice juste en dessous.",
         ]))
     parts.append(f"[[MOT: {new[0]['kab'] if new else words[0]['kab']}]]")
-    parts.append("[[EXERCICE]]")
+    # l'exercice porte sur un mot qu'on vient de voir (le 2e s'il y en a deux)
+    ex_word = new[-1]["kab"] if new else rng.choice(words)["kab"]
+    parts.append(f"[[EXERCICE: {ex_word}]]")
     keys = {fold(w["kab"]): w["kab"] for w in new}
     _offered.discard(user_id)
     if user_id:
