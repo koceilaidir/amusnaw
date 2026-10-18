@@ -36,6 +36,12 @@ services:
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
+    environment:
+      # Le disque du VPS est lent : charger le modèle peut prendre plusieurs minutes.
+      # On laisse le chargement aller au bout (30 min max), puis on le garde en mémoire.
+      OLLAMA_LOAD_TIMEOUT: 30m
+      OLLAMA_KEEP_ALIVE: "-1"
+      OLLAMA_NUM_PARALLEL: "1"
     volumes:
       - ollama:/root/.ollama
 

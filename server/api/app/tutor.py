@@ -104,9 +104,12 @@ async def warm_up() -> None:
     if not url:
         return
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=10)) as client:
+        # pas de limite de lecture : si on raccroche, Ollama abandonne le chargement
+        async with httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10)) as client:
             await client.post(f"{url}/api/generate", json={"model": get_settings().llm_model, "prompt": "Azul",
-                                                            "keep_alive": -1, "options": {"num_predict": 1}})
+                                                            "keep_alive": -1,
+                                                            # même contexte que les vraies réponses, sinon Ollama recharge le modèle
+                                                            "options": {**OLLAMA_OPTIONS, "num_predict": 1}})
         print("[llm] modèle chargé et gardé en mémoire", flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"[llm] préchauffage impossible : {e}", flush=True)

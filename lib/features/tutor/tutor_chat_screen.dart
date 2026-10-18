@@ -140,7 +140,14 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         'message': text,
         'tz_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
         if (intent != null) 'intent': intent,
-      })) {
+      }).timeout(
+        // 2 minutes sans un mot du prof : on arrête d'attendre et on le dit
+        const Duration(seconds: 120),
+        onTimeout: (sink) {
+          sink.addError(ApiException(503, 'timeout'));
+          sink.close();
+        },
+      )) {
         if (!mounted) return;
         switch (ev['type']) {
           case 'delta':
@@ -265,41 +272,6 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     ));
   }
 
-  void _quickActions() {
-    showCupertinoModalPopup<void>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _push(const LearnScreen());
-              },
-              child: const Text('Leçons')),
-          CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _wordOfDay();
-              },
-              child: const Text('Mot du jour')),
-          CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _review();
-              },
-              child: const Text('Réviser mes mots')),
-          CupertinoActionSheetAction(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _push(const CultureScreen());
-              },
-              child: const Text('Culture et histoire')),
-        ],
-        cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-      ),
-    );
-  }
-
   void _themeMenu() {
     final top = MediaQuery.paddingOf(context).top + 60;
     showGeneralDialog<void>(
@@ -335,6 +307,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       onOpen: _openConversation,
       onPush: _push,
       onWordOfDay: _wordOfDay,
+      onReview: _review,
       docked: wide,
     );
     return Scaffold(
@@ -436,7 +409,6 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                 topics: empty ? _topics : const [],
                 onSend: () => _send(_input.text),
                 onTopic: (t) => _send(t, intent: 'talk'),
-                onPlus: _quickActions,
                 focusNode: _inputFocus,
               )),
             ],
@@ -731,14 +703,13 @@ class _Composer extends StatelessWidget {
     required this.topics,
     required this.onSend,
     required this.onTopic,
-    required this.onPlus,
     required this.focusNode,
   });
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool sending;
   final List<String> topics;
-  final VoidCallback onSend, onPlus;
+  final VoidCallback onSend;
   final ValueChanged<String> onTopic;
 
   @override
@@ -757,16 +728,9 @@ class _Composer extends StatelessWidget {
             boxShadow: p.shadowLg,
           ),
           child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            _Circle(
-              label: 'Raccourcis',
-              color: p.fill,
-              onTap: onPlus,
-              child: Icon(CupertinoIcons.add, size: 20, color: p.text),
-            ),
-            const SizedBox(width: 10),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 2),
+                padding: const EdgeInsets.only(left: 10, bottom: 2),
                 child: TextField(
                   controller: controller,
                   focusNode: focusNode,
@@ -923,11 +887,12 @@ class _AppDrawer extends StatelessWidget {
     required this.onOpen,
     required this.onPush,
     required this.onWordOfDay,
+    required this.onReview,
     this.docked = false,
   });
   final bool docked;
   final String current;
-  final VoidCallback onNewChat, onWordOfDay;
+  final VoidCallback onNewChat, onWordOfDay, onReview;
   final ValueChanged<Conversation> onOpen;
   final ValueChanged<Widget> onPush;
 
@@ -985,6 +950,7 @@ class _AppDrawer extends StatelessWidget {
               const SizedBox(height: 10),
               row(CupertinoIcons.book, 'Leçons', trailing: 'A1', onTap: () => onPush(const LearnScreen())),
               row(CupertinoIcons.sun_min, 'Mot du jour', onTap: onWordOfDay),
+              row(CupertinoIcons.arrow_2_circlepath, 'Réviser mes mots', onTap: onReview),
               row(CupertinoIcons.house, 'Culture et histoire', onTap: () => onPush(const CultureScreen())),
               row(CupertinoIcons.chart_bar_alt_fill, 'Progression',
                   trailing: '${s.learnedTotal} mot${s.learnedTotal > 1 ? 's' : ''}',
