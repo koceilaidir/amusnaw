@@ -54,7 +54,7 @@ def build_system_prompt(user: User, profile: LearnerProfile, *, days_away: int,
     template = (Path(get_settings().prompts_dir) / "tutor_system_prompt.md").read_text("utf-8")
     body = template.split("---", 1)[-1]
     values = {
-        "name": user.name or "",
+        "name": (user.name or "").strip().title(),
         "interface_language": user.interface_language,
         "level": profile.level.upper(),
         "goals": ", ".join(profile.goals) or "unknown yet",
@@ -78,7 +78,7 @@ REFS_MARK = "\n<<<REFERENCES>>>\n"
 REFS_NOTE = "Elles sont jointes au dernier message de l'élève, sous « RÉFÉRENCES VALIDÉES »."
 HISTORY_TURNS = 8        # messages gardés (4 échanges)
 HISTORY_CHARS = 600      # un long message est raccourci
-MAX_REPLY_TOKENS = 380   # réponse courte : plus rapide, et plus pédagogique
+MAX_REPLY_TOKENS = 700   # filet de sécurité ; la consigne demande ~60 mots, et une fin coupée est retirée
 
 
 def _messages(system: str, history: list[dict], message: str) -> list[dict]:

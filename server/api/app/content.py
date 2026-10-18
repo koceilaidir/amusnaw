@@ -204,7 +204,7 @@ def session_plan(unit: dict | None) -> str:
     chunks = " ; ".join(f"{c['kab']} = {c['fr']}" for c in unit.get("chunks", []))
     return (f"Unité « {unit['title']} » ({unit['level']}). Objectif : {unit.get('can_do', '')}\n"
             f"Mots de l'unité : {words}\nBlocs de langue : {chunks}\n"
-            f"Activité conseillée : {unit.get('tutor_focus', '')}\n"
+            f"Ce que tu dois faire travailler (consigne pour toi seul, ne la recopie pas) : {unit.get('tutor_focus', '')}\n"
             "Ne présente pas plus de 2 ou 3 mots nouveaux par réponse.")
 
 

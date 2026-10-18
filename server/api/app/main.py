@@ -1,4 +1,5 @@
 import json
+import re
 import secrets
 from contextlib import asynccontextmanager
 from datetime import timezone
@@ -17,7 +18,7 @@ from .limits import chat_limit, signup_limit
 from .db import (ChatMessage, LearnedWord, LearnerProfile, Review, SessionLocal, User, get_db,
                  init_db, now)
 from .knowledge import kb
-from . import content, email_login, learning, router
+from . import content, email_login, guide, learning, router
 
 
 _BACKGROUND: set = set()  # tâches de fond gardées en vie
@@ -198,6 +199,14 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session):
     direct = router.direct_reply(body.message, user.interface_language)
     if direct:
         return profile, newly_learned, None, None, direct
+    # 3. Leçon guidée : « Apprendre », « continue », « autre chose »… le programme avance tout seul
+    if user.interface_language == "fr" and guide.wants_next(body.message, body.intent):
+        seen = set(db.scalars(select(LearnedWord.word_key).where(LearnedWord.user_id == user.id)))
+        reply, keys = guide.step(seen, user.name or "")
+        if reply:
+            learning.introduce(db, user.id, keys, "lesson")
+            db.commit()  # enregistré tout de suite : la leçon suivante part de là
+            return profile, newly_learned, None, None, reply
     recent = db.scalars(
         select(ChatMessage).where(ChatMessage.user_id == user.id)
         .order_by(ChatMessage.created_at.desc()).limit(12)
@@ -260,6 +269,18 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
     }
 
 
+def _trim_unfinished(text: str) -> str:
+    """Réponse coupée par la limite de longueur : on retire la phrase inachevée."""
+    t = text.rstrip()
+    if not t or re.search(r"[.!?…»)\]]$", t) or t.endswith("]]"):
+        return t
+    ends = [m.end() for m in re.finditer(r"[.!?…»](?=\s)", t)]
+    if ends and ends[-1] > 40:
+        return t[:ends[-1]].rstrip()
+    nl = t.rfind("\n")  # sinon, on retire la dernière ligne inachevée
+    return t[:nl].rstrip() if nl > 40 else t
+
+
 @app.post("/tutor/chat")
 async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     chat_limit.check(str(user.id))
@@ -270,7 +291,7 @@ async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = D
         reply = tutor.off_topic_reply(user.interface_language)
         return _finish_turn(db, user, profile, body.message, reply, True, newly)
     try:
-        reply = await tutor.ask_model(system, history, body.message)
+        reply = _trim_unfinished(await tutor.ask_model(system, history, body.message))
     except Exception as e:  # modèle indisponible
         raise HTTPException(503, "Tutor is unavailable, try again shortly.") from e
     return _finish_turn(db, user, profile, body.message, reply, False, newly, body.intent, system)
@@ -319,7 +340,7 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
             print(f"[llm] échec : {type(e).__name__}: {e}", flush=True)
             yield event({"type": "error", "message": "Tutor is unavailable, try again shortly."})
             return
-        reply = "".join(parts).strip()
+        reply = _trim_unfinished("".join(parts).strip())
         yield event({"type": "done", **_finish_turn(db, user, profile, body.message, reply, False, newly, body.intent, system)})
 
     return StreamingResponse(gen(), media_type="text/event-stream",

@@ -54,6 +54,7 @@ Ce journal est tenu au fil du projet. Il sert de base au PDF de présentation de
 - **Mot du jour** différent chaque jour, avec son écriture en Tifinagh (conversion automatique).
 - **Révisions espacées** (SM-2) mêlées à la séance du jour.
 - **Programme A1 en 13 unités** (5 mots nouveaux au plus, blocs de langue, reconnaissance puis rappel, révision entrelacée, une capsule culture par unité ; références dans `docs/PEDAGOGIE.md`).
+- **Leçon guidée par le serveur** : « Apprendre », « continue », « autre chose »… font avancer le programme A1 deux mots à la fois (mot, phrase utile, carte du mot, exercice), sans le modèle : instantané, jamais répété, rien d'inventé. Passage automatique à l'unité suivante.
 - **Le prof suit le programme** et passe à l'unité suivante quand l'élève a rencontré tous les mots.
 
 ### Design (V2, « le chat d'abord »)
