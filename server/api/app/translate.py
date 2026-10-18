@@ -199,6 +199,11 @@ def _sentences(text: str) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
+def _fix_letters(t: str) -> str:
+    """NLLB écrit parfois les lettres kabyles avec leurs sosies grecs (ε, γ) : on remet les bonnes."""
+    return t.replace("ε", "ɛ").replace("γ", "ɣ").replace("Ɛ", "Ɛ")
+
+
 async def machine(sentences: list[str], src: str, tgt: str) -> list[str] | None:
     """Traduit une liste de phrases avec NLLB. None si le service n'est pas lancé."""
     url = get_settings().mt_url.rstrip("/")
@@ -209,7 +214,7 @@ async def machine(sentences: list[str], src: str, tgt: str) -> list[str] | None:
             r = await client.post(f"{url}/translate", json={
                 "sentences": sentences, "src": NLLB[src], "tgt": NLLB[tgt]})
             r.raise_for_status()
-            return r.json()["translations"]
+            return [_fix_letters(t) for t in r.json()["translations"]]
     except Exception as e:  # noqa: BLE001 — service absent ou en panne : on le dit, sans planter
         print(f"[traduction] NLLB indisponible : {type(e).__name__}: {e}", flush=True)
         return None
