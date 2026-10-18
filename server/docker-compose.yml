@@ -45,6 +45,15 @@ services:
     volumes:
       - ollama:/root/.ollama
 
+  # Moteur de traduction NLLB-200 (gratuit, sur processeur). Onglet « Traduire » et « traduis… ».
+  #   docker compose --profile mt up -d --build mt
+  mt:
+    build: ./mt
+    profiles: ["mt"]
+    restart: unless-stopped
+    environment:
+      OMP_NUM_THREADS: "2"
+
   # HTTPS automatique (Let's Encrypt) devant l'API.
   caddy:
     image: caddy:2-alpine

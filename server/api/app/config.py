@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     brevo_api_key: str = ""
     mail_from: str = ""            # ex. bonjour@amusnaw.dz (domaine validé chez Brevo)
     mail_from_name: str = "Amusnaw"
+    # Moteur de traduction NLLB (service « mt » de docker-compose). Vide = désactivé.
+    mt_url: str = "http://mt:8100"
 
     @property
     def google_audiences(self) -> list[str]:

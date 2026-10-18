@@ -49,19 +49,9 @@ String learnedMessage(String lang, List<String> words, int total) {
 /// Les deux espaces de l'app : apprendre avec le programme, ou discuter librement.
 enum ChatMode { learn, talk }
 
-/// Dans « Discuter » : converser, faire traduire, faire corriger son kabyle.
-enum TalkKind {
-  conversation('Conversation', 'talk', 'Écris en kabyle, en français, ou les deux…',
-      ['Azul ! Amek telliḍ ?', 'Comment on dit « bon appétit » ?', 'Parle-moi de Yennayer']),
-  translate('Traduire', 'translate', 'Écris le texte à traduire…',
-      ['Bonjour, je m’appelle Koceila.', 'Tanemmirt aṭas', 'J’habite à Tizi Ouzou.']),
-  correct('Corriger mon kabyle', 'correct', 'Écris ton kabyle, je le corrige…',
-      ['Azul, isem-inu Koceila', 'Nekk ad lmadeɣ taqbaylit']);
-
-  const TalkKind(this.label, this.intent, this.hint, this.examples);
-  final String label, intent, hint;
-  final List<String> examples;
-}
+/// Exemples proposés sous le champ de saisie, dans « Discuter ».
+/// Pas d'onglets : on demande simplement ce qu'on veut (« traduis… », « corrige… »).
+const _talkExamples = ['Azul ! Amek telliḍ ?', 'Traduis : bonjour, je m’appelle Koceila', 'Corrige : isem-inu Koceila'];
 
 /// Une discussion de l'espace « Discuter » a un identifiant qui commence par « t- ».
 ChatMode modeOf(Conversation c) => c.id.startsWith('t-') ? ChatMode.talk : ChatMode.learn;
@@ -89,7 +79,6 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
   late ChatMode _mode = widget.initialMode ?? ChatMode.learn;
-  TalkKind _talk = TalkKind.conversation;
   late Conversation _conv = _blank(_mode);
   // Programme A1 (unités et avancement), venu du serveur
   List<Map<String, dynamic>> _units = const [];
@@ -144,10 +133,6 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     _dropFocus();
   }
 
-  void _setTalk(TalkKind k) {
-    if (k == _talk) return;
-    setState(() => _talk = k);
-  }
 
   Future<void> _maybeOfferAccount() async {
     if (!_guest || !authService.googleEnabled) return;
@@ -221,7 +206,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     final text = raw.trim();
     if (text.isEmpty || _sending) return;
     // Dans « Discuter », chaque message dit au serveur ce qu'on attend : discussion, traduction, correction.
-    intent ??= _mode == ChatMode.talk ? _talk.intent : null;
+    intent ??= _mode == ChatMode.talk ? 'talk' : null;
     _input.clear();
     FocusScope.of(context).unfocus();
     final conv = _conv;
@@ -535,16 +520,14 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                   ],
                 ),
               ),
-              if (_mode == ChatMode.talk)
-                _TalkBar(kind: _talk, onChanged: _setTalk)
-              else if (!empty && _currentUnit != null && _currentUnit! < _units.length)
+              if (_mode == ChatMode.learn && !empty && _currentUnit != null && _currentUnit! < _units.length)
                 _UnitBar(unit: _units[_currentUnit!], index: _currentUnit!),
               Expanded(
                 child: ReadingWidth(child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
                   child: empty
                       ? (_mode == ChatMode.talk
-                          ? _TalkHome(key: ValueKey('talk-${_talk.name}'), kind: _talk)
+                          ? const _TalkHome(key: ValueKey('talk'))
                           : _Home(
                               key: const ValueKey('home'),
                               today: _today,
@@ -562,11 +545,13 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
               ReadingWidth(child: _Composer(
                 controller: _input,
                 sending: _sending,
-                topics: empty ? (_mode == ChatMode.talk ? _talk.examples : _topics) : _suggestions,
+                topics: empty ? (_mode == ChatMode.talk ? _talkExamples : _topics) : _suggestions,
                 onSend: () => _send(_input.text),
                 onTopic: (t) => _send(t),
                 focusNode: _inputFocus,
-                hint: _mode == ChatMode.talk ? _talk.hint : (empty ? 'Écris ton message…' : 'Écris ta réponse…'),
+                hint: _mode == ChatMode.talk
+                    ? 'Écris en kabyle, en français, ou les deux…'
+                    : (empty ? 'Écris ton message…' : 'Écris ta réponse…'),
                 note: _mode == ChatMode.talk ? 'L’IA peut se tromper en kabyle : vérifie les phrases importantes.' : null,
               )),
             ],
@@ -1449,76 +1434,16 @@ class _UnitBar extends StatelessWidget {
   }
 }
 
-/// « Discuter » : choisir entre conversation, traduction et correction.
-class _TalkBar extends StatelessWidget {
-  const _TalkBar({required this.kind, required this.onChanged});
-  final TalkKind kind;
-  final ValueChanged<TalkKind> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Center(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(color: p.fill, borderRadius: BorderRadius.circular(999)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              for (final k in TalkKind.values)
-                Semantics(
-                  button: true,
-                  selected: k == kind,
-                  child: GestureDetector(
-                    onTap: () => onChanged(k),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: k == kind ? p.surface : Colors.transparent,
-                        borderRadius: BorderRadius.circular(999),
-                        boxShadow: k == kind ? p.shadow : null,
-                      ),
-                      child: Text(k.label,
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: k == kind ? FontWeight.w600 : FontWeight.w500,
-                              color: k == kind ? p.text : p.text2)),
-                    ),
-                  ),
-                ),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Accueil de « Discuter », selon ce qu'on veut faire.
+/// Accueil de « Discuter » : on parle, et on demande ce qu'on veut.
 class _TalkHome extends StatelessWidget {
-  const _TalkHome({super.key, required this.kind});
-  final TalkKind kind;
+  const _TalkHome({super.key});
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    final (title, text) = switch (kind) {
-      TalkKind.conversation => (
-          'Parle-moi en kabyle.',
-          'En kabyle, en français, ou en mélangeant les deux : je te réponds en kabyle simple, avec la traduction.'
-        ),
-      TalkKind.translate => (
-          'Traduire un texte.',
-          'Écris une phrase en français ou en kabyle : je la traduis et je t’explique les mots importants.'
-        ),
-      TalkKind.correct => (
-          'Corriger ton kabyle.',
-          'Écris une phrase en kabyle : je te renvoie la bonne version et je t’explique chaque correction.'
-        ),
-    };
+    const title = 'Parle-moi en kabyle.';
+    const text = 'En kabyle, en français, ou en mélangeant les deux. Tu peux aussi me demander de traduire '
+        'un texte ou de corriger ton kabyle : demande simplement ce que tu veux.';
     return LayoutBuilder(
       builder: (context, box) => SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
@@ -1536,7 +1461,6 @@ class _TalkHome extends StatelessWidget {
               const SizedBox(height: 12),
               Text(text, style: TextStyle(fontSize: 17, height: 1.45, color: p.text2)),
               const SizedBox(height: 8),
-              Text('Ou touche un exemple juste en dessous.', style: TextStyle(fontSize: 15, color: p.text2)),
             ],
           ),
         ),

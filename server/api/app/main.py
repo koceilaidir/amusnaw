@@ -19,7 +19,7 @@ from .limits import chat_limit, signup_limit
 from .db import (ChatMessage, LearnedWord, LearnerProfile, Review, SavedConversation, SessionLocal, User,
                  get_db, init_db, now)
 from .knowledge import kb
-from . import content, email_login, guide, learning, router
+from . import content, email_login, guide, learning, router, translate
 
 
 _BACKGROUND: set = set()  # tâches de fond gardées en vie
@@ -34,6 +34,9 @@ async def lifespan(_: FastAPI):
         router.MORPH = Lemmatizer.load(get_settings().data_dir, get_settings().content_dir)
     except Exception as e:  # noqa: BLE001 — l'app marche sans
         print(f"[morph] non chargé : {e}", flush=True)
+    # Mémoire de traduction (phrases traduites par des humains), construite en tâche de fond
+    import threading
+    threading.Thread(target=translate.build_memory, daemon=True).start()
     with SessionLocal() as db:  # réapplique les décisions du linguiste
         for r in db.scalars(select(Review)):
             kb.apply_review(r.item_id, r.status, r.kab, r.fr)
@@ -207,20 +210,48 @@ INTENT_HINTS = {
                "dis-le simplement et félicite-le. Si tu n'es pas sûr, dis-le honnêtement.",
 }
 
+_CORRECT = re.compile(r"\b(corrige\w*|corriger|correction|est-ce (?:que c'est )?juste|c'est juste \?)", re.I)
+
 # Plan de séance remplacé dans l'espace « Discuter »
 TALK_PLAN = ("Espace « Discuter » : l'élève ne suit pas de leçon ici. Ne propose ni leçon ni exercice, "
              "ne termine pas par [[EXERCICE]].")
 
 
-def _prepare_turn(body: "ChatIn", user: User, db: Session):
-    """Ce qui précède l'appel au modèle : mots réemployés, filtre, prompt."""
+async def _translation(body: "ChatIn", user: User, db: Session) -> str | None:
+    """Onglet « Traduire », ou demande « traduis… » n'importe où (même en pleine leçon) :
+    traduction par la mémoire humaine et NLLB, jamais inventée par le petit modèle."""
+    if body.intent != "translate" and not translate.is_request(body.message):
+        return None
+    text = body.message if body.intent == "translate" and not translate.is_request(body.message) \
+        else translate.extract(body.message)
+    if not text:  # « traduis ça » : le texte est dans le message précédent
+        prev = db.scalars(select(ChatMessage).where(ChatMessage.user_id == user.id, ChatMessage.role == "user")
+                          .order_by(ChatMessage.created_at.desc()).limit(4)).all()
+        text = next((p.content for p in prev if not translate.is_request(p.content)), "")
+    body.intent = "translate"  # pas de leçon ni d'exercice dans cette réponse
+    out = await translate.reply(text, user.interface_language)
+    if out is None and len(text.split()) > 12:
+        # moteur de traduction absent : le petit modèle inventerait, on le dit plutôt
+        return ("Je ne peux pas encore traduire un texte aussi long de façon fiable. "
+                "Envoie-le-moi phrase par phrase, ou demande-moi le sens d'un mot précis.")
+    return out
+
+
+def _prepare_turn(body: "ChatIn", user: User, db: Session, ready: str | None = None):
+    """Ce qui précède l'appel au modèle : mots réemployés, filtre, prompt.
+    `ready` : réponse déjà écrite par le serveur (traduction)."""
     profile = db.get(LearnerProfile, user.id) or LearnerProfile(user_id=user.id)
     tz = body.tz_offset_minutes
     # 1. L'élève a-t-il réemployé des mots découverts un jour précédent ?
     newly_learned = learning.check_reused(db, user.id, body.message, tz)
+    if ready:
+        return profile, newly_learned, None, None, ready
     if tutor.is_obviously_off_topic(body.message):
         return profile, newly_learned, None, None, None
     # 2. Réponse exacte écrite par le serveur (vocabulaire, conjugaison, hors sujet évident)
+    # « Corrige… » n'importe où (comme avec les autres IA) : mode correction pour cette réponse
+    if _CORRECT.search(body.message):
+        body.intent = "correct"
     talk = body.intent in TALK_MODES
     direct = None if body.intent == "correct" else router.direct_reply(body.message, user.interface_language)
     if direct:
@@ -324,7 +355,8 @@ def _trim_unfinished(text: str) -> str:
 @app.post("/tutor/chat")
 async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     chat_limit.check(str(user.id))
-    profile, newly, system, history, direct = _prepare_turn(body, user, db)
+    ready = await _translation(body, user, db)
+    profile, newly, system, history, direct = _prepare_turn(body, user, db, ready)
     if direct:
         return _finish_turn(db, user, profile, body.message, direct, False, newly, body.intent, direct)
     if system is None:
@@ -345,7 +377,8 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
       data: {"type": "done", "reply": …, "off_topic": …, "learned": {…}}
       data: {"type": "error", "message": …}
     """
-    profile, newly, system, history, direct = _prepare_turn(body, user, db)
+    ready = await _translation(body, user, db)
+    profile, newly, system, history, direct = _prepare_turn(body, user, db, ready)
 
     def event(obj: dict) -> str:
         return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
