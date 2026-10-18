@@ -197,8 +197,13 @@ def _say(rng: random.Random, it: Item, asked: str) -> str:
         "À toi : écris-le une fois pour le retenir.",
         "Tu veux un autre mot de la même famille ?",
     ])
-    src = f" (Source : {it.source}.)" if it.source and "Programme" not in it.source else ""
+    src = f" (Source : {it.source}.)" if _sources() and it.source and "Programme" not in it.source else ""
     return f"{intro}{src} {ask}" + (f"\n[[MOT: {it.kab}]]" if it.kind == "word" else "")
+
+
+def _sources() -> bool:
+    """Citer les ouvrages d'origine ? (réglage SHOW_SOURCES, désactivé sur le site public)"""
+    return get_settings().show_sources
 
 
 def _modern(k: str) -> str:
@@ -228,16 +233,17 @@ def other_senses(it: Item, n: int = 2) -> str:
         if not fr or fold(fr) in seen or len(fr) > 60:
             continue
         seen.add(fold(fr))
-        out.append(f"« {fr} » ({_short_src(o.source)})")
+        out.append(f"« {fr} » ({_short_src(o.source)})" if _sources() else
+                   (f"« {fr} » (usage courant, à confirmer)" if o.domain == "appris" else f"« {fr} »"))
         if len(out) >= n:
             break
-    return f" Autres sens dans la base : {' ; '.join(out)}." if out else ""
+    return f" Il peut aussi vouloir dire {' ou '.join(out)}." if out else ""
 
 
 def _mean(rng: random.Random, it: Item) -> str:
     fr = _clean_fr(it.fr).rstrip(" .")
     k = _kab(it)
-    src = f" (Source : {it.source}.)" if it.source and "Programme" not in it.source else ""
+    src = f" (Source : {it.source}.)" if _sources() and it.source and "Programme" not in it.source else ""
     if it.kind == "pair" or " " in k:
         return f"« {k} » veut dire : « {fr} ».{src} Tu veux qu'on regarde les mots un par un ?"
     ask = rng.choice(["Tu veux l'employer dans une phrase ?", "Tu veux un exercice avec ce mot ?"])
@@ -284,7 +290,7 @@ def direct_reply(message: str, language: str = "fr") -> str | None:
         x = re.sub(r"^(?:le\s+verbe|au\s+\w+)\s+", "", x, flags=re.I)
         verb = conjugation.find_verb(x, _verbs_path()) or conjugation.find_verb(x.split()[0], _verbs_path())
         if verb:
-            return conjugation.render(verb) + "\n\nÀ toi : écris une phrase avec « ad " + \
+            return conjugation.render(verb, sources=_sources()) + "\n\nÀ toi : écris une phrase avec « ad " + \
                 conjugation.conjugate(verb)["aor"]["1sg"] + " » (je vais …)."
         return (f"Je n'ai pas encore le verbe « {x} » dans mes tableaux vérifiés. Je peux te conjuguer par "
                 "exemple : aru (écrire), ečč (manger), ini (dire), issin (savoir), ɣer (lire), ruḥ (aller). "
@@ -299,10 +305,8 @@ def direct_reply(message: str, language: str = "fr") -> str | None:
             return ex
         en = MORPH.meanings_en.get(_strip(x).lower()) if MORPH is not None else None
         if en:
-            src = ("les traductions de logiciels libres" if MORPH.meanings_en_src.get(_strip(x).lower()) == "logiciels"
-                   else "les phrases de Tatoeba")
-            return (f"Je n'ai pas encore le sens de « {_strip(x)} » vérifié en français. D'après {src}, "
-                    f"il correspond à l'anglais « {en} ». Tu veux un autre mot ?")
+            return (f"Je n'ai pas encore le sens de « {_strip(x)} » vérifié en français. "
+                    f"En anglais, il correspond à « {en} ». Tu veux un autre mot ?")
     if _QUESTION.search(msg) and not _HOW_SAY.match(msg):
         n = grammar_note(msg)
         if n:

@@ -30,6 +30,13 @@ class ApiClient {
             body: jsonEncode(body),
           ));
 
+  Future<Map<String, dynamic>> put(String path, Map<String, dynamic> body) =>
+      _send(() async => http.put(
+            Uri.parse('${AppConfig.apiBaseUrl}$path'),
+            headers: await _headers(),
+            body: jsonEncode(body),
+          ));
+
   Future<Map<String, dynamic>> get(String path) async =>
       (await getAny(path)) as Map<String, dynamic>;
 

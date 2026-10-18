@@ -3,46 +3,85 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Amusnaw · Confidentialité</title>
+<title>Confidentialité · Amusnaw</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/favicon.png">
+<meta name="theme-color" content="#56662E">
 <style>
-  :root { --bg:#F2F2F7; --surface:#fff; --text:#000; --text2:#6C6C70; --accent:#2F54C8; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#000; --surface:#1C1C1E; --text:#fff; --text2:#AEAEB2; --accent:#7D97F5; } }
-  body { margin:0; background:var(--bg); color:var(--text); font:17px/1.55 -apple-system, BlinkMacSystemFont, "Noto Sans", sans-serif; }
-  main { max-width:720px; margin:0 auto; padding:32px 20px 64px; }
-  h1 { font-size:32px; margin:0 0 4px; } h2 { font-size:20px; margin:28px 0 8px; }
-  .card { background:var(--surface); border-radius:14px; padding:16px 20px; margin:12px 0; }
-  .muted { color:var(--text2); font-size:14px; }
-  a { color:var(--accent); }
+  @font-face { font-family: Onest; font-weight: 400; src: url("/assets/assets/fonts/Onest-400.ttf"); }
+  @font-face { font-family: Onest; font-weight: 500; src: url("/assets/assets/fonts/Onest-500.ttf"); }
+  @font-face { font-family: Onest; font-weight: 600; src: url("/assets/assets/fonts/Onest-600.ttf"); }
+  :root {
+    --olive: #56662E; --bgTop: #EFE7DC; --bg: #F6F4F0; --surface: #FFFFFF; --text: #1D1B18;
+    --text2: #6B675F; --separator: #E3DED5; --onOlive: #F8F6F1;
+    --shadow: 0 1px 2px rgba(29,27,24,.05), 0 6px 20px rgba(29,27,24,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bgTop: #231F1B; --bg: #141312; --surface: #1E1D1B; --text: #F3EFE8; --text2: #ABA59C;
+            --separator: #36332F; --shadow: 0 10px 30px rgba(0,0,0,.35); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: var(--text); font: 17px/1.55 Onest, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: linear-gradient(var(--bgTop), var(--bg) 420px) no-repeat, var(--bg); min-height: 100vh; }
+  header { max-width: 760px; margin: 0 auto; padding: 20px 20px 0; display: flex; align-items: center; gap: 10px; }
+  header a { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none;
+             font-weight: 600; font-size: 19px; letter-spacing: -.3px; }
+  .mark { width: 36px; height: 36px; border-radius: 10px; background: var(--olive); display: grid; place-items: center; }
+  .mark svg { width: 24px; height: 24px; }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 20px 72px; }
+  h1 { font-size: 34px; line-height: 1.15; font-weight: 600; letter-spacing: -.8px; margin: 0 0 6px; }
+  .lead { color: var(--text2); margin: 0 0 8px; }
+  h2 { font-size: 13px; font-weight: 500; letter-spacing: .4px; text-transform: uppercase; color: var(--text2);
+       margin: 30px 4px 8px; }
+  .card { background: var(--surface); border: .5px solid var(--separator); border-radius: 20px;
+          padding: 6px 20px; box-shadow: var(--shadow); }
+  .card p { margin: 14px 0; }
+  .card p + p { border-top: .5px solid var(--separator); padding-top: 14px; }
+  b { font-weight: 600; }
+  .back { display: inline-block; margin-top: 32px; background: var(--olive); color: var(--onOlive);
+          text-decoration: none; font-weight: 600; padding: 13px 22px; border-radius: 999px; }
 </style>
 </head>
 <body>
+<header>
+  <a href="/">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="-4 -1 108 100" fill="none" stroke="#F8F6F1" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M36 18 L71 70 Q76 78 80 71 L91 57"/><path d="M64 18 L29 70 Q24 78 20 71 L9 57"/><path d="M21 36 L39 55"/><path d="M79 36 L61 55"/>
+      </svg>
+    </span>
+    amusnaw
+  </a>
+</header>
 <main>
-  <h1>Politique de confidentialité</h1>
-  <p class="muted">Amusnaw — application d'apprentissage du kabyle, réalisée pour le Haut Commissariat à l'Amazighité (HCA). Dernière mise à jour : octobre 2026.</p>
+  <h1>Confidentialité</h1>
+  <p class="lead">Ce que nous gardons, pourquoi, et comment tout effacer. Dernière mise à jour : octobre 2026.</p>
 
   <h2>Données collectées</h2>
   <div class="card">
-    <p><b>Compte</b> : identifiant fourni par Google ou Apple (et, selon votre choix, votre prénom et votre adresse e-mail). Aucun mot de passe n'est stocké.</p>
+    <p><b>Sans compte</b> : un identifiant anonyme est créé sur votre appareil pour que le prof se souvienne de la conversation en cours. Aucune information personnelle n'est demandée.</p>
+    <p><b>Avec un compte</b> : l'identifiant fourni par Google (et, selon votre choix, votre prénom et votre adresse e-mail). Aucun mot de passe n'est stocké.</p>
     <p><b>Apprentissage</b> : vos conversations avec le prof, vos réponses aux exercices, les mots que vous avez appris, votre niveau et vos objectifs.</p>
-    <p><b>Réglages</b> : langue d'explication, préférences de rappel. Les rappels quotidiens sont programmés sur votre téléphone.</p>
+    <p><b>Réglages</b> : langue d'explication, apparence, préférences de rappel.</p>
   </div>
 
   <h2>Utilisation</h2>
   <div class="card">
-    <p>Ces données servent uniquement à faire fonctionner l'application : adapter les leçons à votre niveau, suivre votre progression, et améliorer la qualité du prof. Les conversations peuvent être relues par des linguistes, de façon anonymisée, pour corriger le kabyle et entraîner les futures versions du modèle d'Amusnaw.</p>
+    <p>Ces données servent uniquement à faire fonctionner Amusnaw : adapter les leçons à votre niveau, suivre votre progression, retrouver vos discussions et améliorer la qualité du prof. Les conversations peuvent être relues de façon anonymisée pour corriger le kabyle du prof.</p>
     <p>Aucune donnée n'est vendue ni utilisée à des fins publicitaires.</p>
   </div>
 
   <h2>Hébergement</h2>
   <div class="card">
-    <p>Les données sont hébergées sur un serveur situé en Algérie. Le modèle d'intelligence artificielle fonctionne sur ce même serveur : vos messages ne sont pas envoyés à un service d'IA tiers.</p>
+    <p>Les données sont hébergées sur notre propre serveur. Le modèle d'intelligence artificielle fonctionne sur ce même serveur : vos messages ne sont pas envoyés à un service d'IA tiers.</p>
   </div>
 
   <h2>Vos droits</h2>
   <div class="card">
-    <p>Vous pouvez supprimer votre compte et toutes vos données à tout moment depuis l'application : <b>Réglages → Supprimer mon compte</b>. La suppression est immédiate et définitive.</p>
-    <p>Pour toute question : [ADRESSE E-MAIL DE CONTACT].</p>
+    <p>Vous pouvez supprimer votre compte et toutes vos données à tout moment : <b>Réglages → Supprimer mon compte</b>. La suppression est immédiate et définitive.</p>
   </div>
+
+  <a class="back" href="/">Retour à Amusnaw</a>
 </main>
 </body>
 </html>

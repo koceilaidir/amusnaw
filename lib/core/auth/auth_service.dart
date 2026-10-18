@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -31,22 +34,66 @@ class AuthSession {
 /// (VPS). Le serveur vérifie la signature du jeton : aucun mot de passe
 /// n'est jamais stocké.
 class AuthService {
+  AuthService() {
+    // Site web : Google affiche son propre bouton ; la connexion arrive par cet événement.
+    if (kIsWeb && googleEnabled) {
+      _google.onCurrentUserChanged.listen((account) async {
+        if (account == null) return;
+        try {
+          final s = await _googleSession(account);
+          if (s != null) _webSessions.add(s);
+        } catch (e) {
+          _webSessions.addError(e);
+        }
+      });
+    }
+  }
+
   final _storage = const FlutterSecureStorage();
-  final _google = GoogleSignIn(
-    scopes: const ['email'],
-    serverClientId: AppConfig.googleServerClientId.isEmpty
-        ? null
-        : AppConfig.googleServerClientId,
-  );
+  final _google = kIsWeb
+      ? GoogleSignIn(scopes: const ['email'], clientId: AppConfig.googleServerClientId)
+      : GoogleSignIn(
+          scopes: const ['email'],
+          serverClientId: AppConfig.googleServerClientId.isEmpty ? null : AppConfig.googleServerClientId,
+        );
+  final _webSessions = StreamController<AuthSession>.broadcast();
+
+  /// Connexion Google disponible (identifiant client fourni au build).
+  bool get googleEnabled => AppConfig.googleServerClientId.isNotEmpty;
+
+  /// Site web : sessions ouvertes par le bouton Google.
+  Stream<AuthSession> get webGoogleSessions => _webSessions.stream;
+
+  /// Site web : prépare Google (à appeler avant d'afficher son bouton).
+  Future<void> initGoogleWeb() async {
+    if (!kIsWeb || !googleEnabled) return;
+    try {
+      await _google.signInSilently();
+    } catch (_) {}
+  }
 
   Future<AuthSession?> signInWithGoogle() async {
     final account = await _google.signIn();
     if (account == null) return null; // annulé par l'utilisateur
+    return _googleSession(account);
+  }
+
+  Future<AuthSession?> _googleSession(GoogleSignInAccount account) async {
     final auth = await account.authentication;
     final idToken = auth.idToken;
-    if (idToken == null) throw AuthException('Google sign-in failed.');
-    return _exchange('/auth/google', {'id_token': idToken});
+    if (idToken == null) throw AuthException('Connexion Google impossible.');
+    // Visiteur sans compte : sa progression et ses discussions passent sur le compte.
+    final guestToken = await isGuest() ? await currentToken() : null;
+    final s = await _exchange('/auth/google', {
+      'id_token': idToken,
+      if (guestToken != null) 'guest_token': guestToken,
+    });
+    await _storage.delete(key: 'guest');
+    return s;
   }
+
+  /// Vrai si l'on utilise Amusnaw sans compte (identifiant anonyme de l'appareil).
+  Future<bool> isGuest() async => (await _storage.read(key: 'guest')) == '1';
 
   Future<AuthSession?> signInWithApple() async {
     try {
@@ -121,12 +168,15 @@ class AuthService {
   }
 
   /// Étape 2 : le code reçu. Le compte est créé au premier passage.
-  Future<AuthSession> signInWithEmailCode(String email, String code, {String? name}) =>
-      _exchange('/auth/email/verify', {
-        'email': email,
-        'code': code,
-        if (name != null && name.isNotEmpty) 'name': name,
-      });
+  Future<AuthSession> signInWithEmailCode(String email, String code, {String? name}) async {
+    final s = await _exchange('/auth/email/verify', {
+      'email': email,
+      'code': code,
+      if (name != null && name.isNotEmpty) 'name': name,
+    });
+    await _storage.delete(key: 'guest');
+    return s;
+  }
 
   Future<String?> currentToken() => _storage.read(key: 'access_token');
 
@@ -153,12 +203,17 @@ class AuthService {
       deviceId = List.generate(16, (_) => r.nextInt(16).toRadixString(16)).join();
       await _storage.write(key: 'dev_device_id', value: deviceId);
     }
-    return _exchange('/auth/dev', {'device_id': deviceId, 'name': name});
+    final s = await _exchange('/auth/dev', {'device_id': deviceId, 'name': name});
+    await _storage.write(key: 'guest', value: '1');
+    return s;
   }
 
   Future<void> signOut() async {
     await _storage.delete(key: 'access_token');
-    await _google.signOut();
+    await _storage.delete(key: 'guest');
+    try {
+      await _google.signOut();
+    } catch (_) {}
   }
 }
 

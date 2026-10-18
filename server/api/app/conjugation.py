@@ -139,7 +139,7 @@ def find_verb(word: str, path: str) -> dict | None:
     return idx.get(w) or idx.get("fr:" + w) or idx.get("fr:" + re.sub(r"^(s'|se )", "", w))
 
 
-def render(verb: dict, attested: set[str] | None = None) -> str:
+def render(verb: dict, attested: set[str] | None = None, sources: bool = False) -> str:
     """Tableau texte (markdown simple) de la conjugaison, prêt à citer tel quel."""
     table = conjugate(verb)
     lines = [f"Conjugaison de « {verb['lemma']} » ({verb['fr']}) :"]
@@ -152,8 +152,8 @@ def render(verb: dict, attested: set[str] | None = None) -> str:
             elif aspect == "aor":
                 f = f"ad {f}"
             lines.append(f"- {PERSON_LABEL[p]} : {f}")
-    if verb.get("paradigm"):
+    if sources and verb.get("paradigm"):
         lines.append("\nSource : tables de conjugaison taqbaylit/kabyle-verbs (amyag.com), CC BY 4.0.")
-    else:
+    elif sources:
         lines.append("\nSource : règles de K. Bouamara (HAL, 2026).")
     return "\n".join(lines)

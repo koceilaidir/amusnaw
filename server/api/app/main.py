@@ -12,11 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import tutor
-from .auth import current_user, issue_token, upsert_user, verify_apple, verify_google
+from .auth import (current_user, issue_token, link_guest, upsert_user, user_from_token, verify_apple,
+                   verify_google)
 from .config import get_settings
 from .limits import chat_limit, signup_limit
-from .db import (ChatMessage, LearnedWord, LearnerProfile, Review, SessionLocal, User, get_db,
-                 init_db, now)
+from .db import (ChatMessage, LearnedWord, LearnerProfile, Review, SavedConversation, SessionLocal, User,
+                 get_db, init_db, now)
 from .knowledge import kb
 from . import content, email_login, guide, learning, router
 
@@ -49,6 +50,7 @@ app = FastAPI(title="Amusnaw API", version="0.2.0", lifespan=lifespan)
 class GoogleLogin(BaseModel):
     id_token: str
     interface_language: str = "en"
+    guest_token: str | None = None  # visiteur sans compte : sa progression passe sur le compte
 
 
 class AppleLogin(BaseModel):
@@ -68,7 +70,7 @@ def _session(user: User) -> dict:
         "access_token": issue_token(user),
         "token_type": "bearer",
         "user": {"id": user.id, "name": user.name, "email": user.email,
-                 "interface_language": user.interface_language},
+                 "interface_language": user.interface_language, "guest": user.provider == "dev"},
     }
 
 
@@ -80,8 +82,9 @@ def health():
 @app.post("/auth/google")
 def login_google(body: GoogleLogin, db: Session = Depends(get_db)):
     c = verify_google(body.id_token)
-    user = upsert_user(db, provider="google", sub=c["sub"], email=c.get("email"),
-                       name=c.get("name"), language=body.interface_language)
+    user = link_guest(db, user_from_token(db, body.guest_token), provider="google", sub=c["sub"],
+                      email=c.get("email"), name=c.get("given_name") or c.get("name"),
+                      language=body.interface_language)
     return _session(user)
 
 
@@ -98,7 +101,9 @@ def login_dev(body: DevLogin, request: Request, db: Session = Depends(get_db)):
     """Connexion sans compte (DEV_LOGIN=true) : un compte par appareil, sans Google/Apple."""
     if not get_settings().dev_login:
         raise HTTPException(404)
-    signup_limit.check(_ip(request))
+    known = db.scalar(select(User).where(User.provider == "dev", User.provider_sub == body.device_id))
+    if known is None:  # seuls les nouveaux visiteurs comptent dans la limite
+        signup_limit.check(_ip(request))
     user = upsert_user(db, provider="dev", sub=body.device_id, email=None,
                        name=body.name, language=body.interface_language)
     return _session(user)
@@ -199,14 +204,20 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session):
     direct = router.direct_reply(body.message, user.interface_language)
     if direct:
         return profile, newly_learned, None, None, direct
-    # 3. Leçon guidée : « Apprendre », « continue », « autre chose »… le programme avance tout seul
-    if user.interface_language == "fr" and guide.wants_next(body.message, body.intent):
-        seen = set(db.scalars(select(LearnedWord.word_key).where(LearnedWord.user_id == user.id)))
-        reply, keys = guide.step(seen, user.name or "")
-        if reply:
-            learning.introduce(db, user.id, keys, "lesson")
-            db.commit()  # enregistré tout de suite : la leçon suivante part de là
-            return profile, newly_learned, None, None, reply
+    # 3. Leçon guidée : « Apprendre », « continue », « autre chose »… le programme avance tout seul,
+    #    et la réponse de l'élève à l'exercice est vérifiée (bravo, ou correction douce).
+    if user.interface_language == "fr":
+        if body.intent != "learn" and (ans := guide.check_answer(user.id, body.message)):
+            _SUGGEST[user.id] = ["Continuer", "Parlons d'autre chose"]
+            return profile, newly_learned, None, None, ans
+        if guide.wants_next(body.message, body.intent, user.id):
+            seen = set(db.scalars(select(LearnedWord.word_key).where(LearnedWord.user_id == user.id)))
+            reply, keys = guide.step(seen, user.id, (user.name or "").strip().title())
+            if reply:
+                learning.introduce(db, user.id, keys, "lesson")
+                db.commit()  # enregistré tout de suite : la leçon suivante part de là
+                _SUGGEST[user.id] = list(guide.SUGGEST_STEP)
+                return profile, newly_learned, None, None, reply
     recent = db.scalars(
         select(ChatMessage).where(ChatMessage.user_id == user.id)
         .order_by(ChatMessage.created_at.desc()).limit(12)
@@ -266,7 +277,12 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
         "off_topic": off_topic,
         "learned": {"new": newly_learned, "total": learning.total_learned(db, user.id)},
         "blocks": blocks,
+        "suggestions": _SUGGEST.pop(user.id, None) or ([] if off_topic else ["Continuer la leçon"]),
     }
+
+
+# Réponses rapides à proposer sous la prochaine réponse (posées par _prepare_turn)
+_SUGGEST: dict[str, list[str]] = {}
 
 
 def _trim_unfinished(text: str) -> str:
@@ -350,7 +366,7 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
 @app.delete("/me")
 def delete_me(user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Suppression du compte et de toutes ses données (exigé par Google et Apple)."""
-    for model in (LearnedWord, ChatMessage, LearnerProfile):
+    for model in (LearnedWord, ChatMessage, SavedConversation, LearnerProfile):
         db.query(model).filter(model.user_id == user.id).delete()
     db.delete(db.get(User, user.id))
     db.commit()
@@ -393,7 +409,59 @@ def privacy_page():
 
 @app.get("/me/progress")
 def my_progress(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    return {"words_learned": learning.total_learned(db, user.id)}
+    """Mots appris + avancement dans chaque unité du programme A1."""
+    from .knowledge import fold  # noqa: PLC0415
+    seen = set(db.scalars(select(LearnedWord.word_key).where(LearnedWord.user_id == user.id)))
+    units, current = [], None
+    for u in content.curriculum_lessons():
+        keys = {fold(w["kab"]) for w in u["words"]}
+        done = len(keys & seen)
+        if current is None and done < len(keys):
+            current = len(units)
+        units.append({"id": u["id"], "title": u["title"], "subtitle": u.get("subtitle", ""),
+                      "total": len(keys), "seen": done})
+    total = sum(u["total"] for u in units) or 1
+    return {"words_learned": learning.total_learned(db, user.id),
+            "words_seen": sum(u["seen"] for u in units),
+            "a1_progress": round(sum(u["seen"] for u in units) / total, 3),
+            "current_unit": current, "units": units}
+
+
+# ---------- Discussions enregistrées ----------
+
+class ConversationIn(BaseModel):
+    title: str = Field(default="", max_length=200)
+    m: list = Field(default_factory=list, max_length=400)
+
+
+@app.get("/me/conversations")
+def list_conversations(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    rows = db.scalars(select(SavedConversation).where(SavedConversation.user_id == user.id)
+                      .order_by(SavedConversation.updated_at.desc()).limit(50)).all()
+    return [{"id": r.client_id, "title": r.title, "at": r.updated_at.isoformat(), "m": r.messages} for r in rows]
+
+
+@app.put("/me/conversations/{cid}")
+def save_conversation(cid: str, body: ConversationIn, user: User = Depends(current_user),
+                      db: Session = Depends(get_db)):
+    if len(cid) > 64 or len(json.dumps(body.m)) > 400_000:
+        raise HTTPException(413, "Conversation trop longue.")
+    row = db.scalar(select(SavedConversation).where(SavedConversation.user_id == user.id,
+                                                    SavedConversation.client_id == cid))
+    if row is None:
+        row = SavedConversation(user_id=user.id, client_id=cid)
+        db.add(row)
+    row.title, row.messages, row.updated_at = body.title, body.m, now()
+    db.commit()
+    return {"saved": True}
+
+
+@app.delete("/me/conversations/{cid}")
+def delete_conversation(cid: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    db.query(SavedConversation).filter(SavedConversation.user_id == user.id,
+                                       SavedConversation.client_id == cid).delete()
+    db.commit()
+    return {"deleted": True}
 
 
 class SeenIn(BaseModel):

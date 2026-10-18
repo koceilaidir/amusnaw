@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../content/sample_content.dart';
@@ -20,6 +21,7 @@ import '../culture/culture_screen.dart';
 import '../exercise/exercise_screen.dart';
 import '../learn/learn_screen.dart';
 import '../progress/progress_screen.dart';
+import '../onboarding/account_dialog.dart';
 import '../settings/settings_screen.dart';
 
 /// « Félicitations… le nombre total est de : N », dans la langue de l'élève.
@@ -60,6 +62,10 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
   late Conversation _conv = _blank();
+  // Réponses rapides proposées par le serveur après la dernière réponse du prof
+  List<String> _suggestions = const [];
+  // Visiteur sans compte (site web) : on lui propose un compte après quelques messages
+  bool _guest = false;
   late Future<TodayContent> _today = contentRepository.today();
   bool _sending = false;
 
@@ -78,9 +84,29 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     _input.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) => _dropFocus());
     _syncProgress();
+    authService.isGuest().then((g) {
+      if (mounted) setState(() => _guest = g);
+    });
     SharedPreferences.getInstance().then((prefs) {
       if (mounted) setState(() => _menuOpen = prefs.getBool('menu_open') ?? true);
     });
+  }
+
+  Future<void> _maybeOfferAccount() async {
+    if (!_guest || !authService.googleEnabled) return;
+    final prefs = await SharedPreferences.getInstance();
+    final n = (prefs.getInt('guest_messages') ?? 0) + 1;
+    await prefs.setInt('guest_messages', n);
+    if ((n == 4 || n == 20) && mounted) await _offerAccount();
+  }
+
+  Future<void> _offerAccount() async {
+    final ok = await showAccountDialog(context);
+    if (!ok || !mounted) return;
+    setState(() => _guest = false);
+    _syncProgress();
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ton compte est prêt : ta progression et tes discussions sont gardées.')));
   }
 
   void _toggleMenu() {
@@ -131,6 +157,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     setState(() {
       conv.messages.add(ChatMsg(text, fromTutor: false));
       _sending = true;
+      _suggestions = const [];
     });
     _scrollToEnd();
     final reply = ChatMsg('', fromTutor: true);
@@ -172,6 +199,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
               }
               reply.text = ev['reply'] as String;
               reply.offTopic = ev['off_topic'] == true;
+              _suggestions = ((ev['suggestions'] as List?) ?? const []).cast<String>();
               if (newWords.isNotEmpty && total != null) {
                 conv.messages.insert(
                     conv.messages.indexOf(reply),
@@ -185,6 +213,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
               }
             });
             conversationStore.save(conv);
+            _maybeOfferAccount();
           case 'error':
             throw ApiException(503, ev['message'] as String? ?? '');
         }
@@ -308,6 +337,8 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       onPush: _push,
       onWordOfDay: _wordOfDay,
       onReview: _review,
+      guest: _guest,
+      onAccount: _offerAccount,
       docked: wide,
     );
     return Scaffold(
@@ -406,9 +437,9 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
               ReadingWidth(child: _Composer(
                 controller: _input,
                 sending: _sending,
-                topics: empty ? _topics : const [],
+                topics: empty ? _topics : _suggestions,
                 onSend: () => _send(_input.text),
-                onTopic: (t) => _send(t, intent: 'talk'),
+                onTopic: (t) => _send(t, intent: empty ? 'talk' : null),
                 focusNode: _inputFocus,
               )),
             ],
@@ -570,7 +601,8 @@ class _MessageList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return ListView(
+    return SelectionArea( // texte sélectionnable et copiable, comme sur les autres IA
+      child: ListView(
       controller: controller,
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
       children: [
@@ -583,6 +615,43 @@ class _MessageList extends StatelessWidget {
             Text('Amusnaw écrit…', style: TextStyle(fontSize: 14, color: p.text2)),
           ]),
       ],
+    ),
+    );
+  }
+}
+
+extension on Widget {
+  /// Message de l'élève + bouton « Copier » dessous, aligné à droite.
+  Widget withCopy(String text, {bool right = false}) => Column(
+        crossAxisAlignment: right ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [this, _CopyButton(text)],
+      );
+}
+
+/// Petit bouton « Copier » sous un message.
+class _CopyButton extends StatelessWidget {
+  const _CopyButton(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Semantics(
+      label: 'Copier',
+      button: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          Clipboard.setData(ClipboardData(text: text.replaceAll('**', '')));
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(const SnackBar(content: Text('Copié'), duration: Duration(seconds: 1)));
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(CupertinoIcons.doc_on_doc, size: 16, color: p.text2),
+        ),
+      ),
     );
   }
 }
@@ -640,7 +709,7 @@ class _Message extends StatelessWidget {
           ),
           child: Text(m.text, style: TextStyle(fontSize: 16, height: 1.4, color: p.text)),
         ),
-      );
+      ).withCopy(m.text, right: true);
     }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text.rich(
@@ -653,6 +722,7 @@ class _Message extends StatelessWidget {
           child: Text('Amusnaw ne parle que de la langue et de la culture kabyles.',
               style: TextStyle(fontSize: 12, color: p.text2)),
         ),
+      if (m.text.isNotEmpty && !m.failed) _CopyButton(m.text),
     ]);
   }
 }
@@ -888,9 +958,13 @@ class _AppDrawer extends StatelessWidget {
     required this.onPush,
     required this.onWordOfDay,
     required this.onReview,
+    this.guest = false,
+    this.onAccount,
     this.docked = false,
   });
   final bool docked;
+  final bool guest;
+  final VoidCallback? onAccount;
   final String current;
   final VoidCallback onNewChat, onWordOfDay, onReview;
   final ValueChanged<Conversation> onOpen;
@@ -1007,9 +1081,18 @@ class _AppDrawer extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(s.name.isEmpty ? 'Mon compte' : s.name,
+                      Text(guest ? 'Sans compte' : (s.name.isEmpty ? 'Mon compte' : s.name),
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: p.text)),
-                      Text('Niveau A1', style: TextStyle(fontSize: 13, color: p.text2)),
+                      if (guest && authService.googleEnabled)
+                        GestureDetector(
+                          onTap: () {
+                            close();
+                            onAccount?.call();
+                          },
+                          child: Text('Créer un compte', style: TextStyle(fontSize: 13, color: p.accentText)),
+                        )
+                      else
+                        Text('Niveau A1', style: TextStyle(fontSize: 13, color: p.text2)),
                     ]),
                   ),
                   Semantics(

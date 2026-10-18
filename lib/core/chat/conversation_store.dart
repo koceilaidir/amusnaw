@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../api/api_client.dart';
+
 /// Un message affiché dans le chat.
 class ChatMsg {
   ChatMsg(this.text,
@@ -86,7 +88,29 @@ class ConversationStore extends ValueNotifier<List<Conversation>> {
     c.updatedAt = DateTime.now();
     final list = [c, ...value.where((x) => x.id != c.id)].take(_max).toList();
     value = list;
-    _prefs?.setString(_key, jsonEncode([for (final x in list) x.toJson()]));
+    _persist();
+    // Copie sur le serveur : la discussion se retrouve sur un autre appareil.
+    final j = c.toJson();
+    api.put('/me/conversations/${c.id}', {'title': j['title'], 'm': j['m']}).catchError((_) => <String, dynamic>{});
+  }
+
+  void _persist() => _prefs?.setString(_key, jsonEncode([for (final x in value) x.toJson()]));
+
+  /// Récupère les discussions enregistrées sur le serveur (après connexion,
+  /// ou à l'ouverture) et les fusionne avec celles de l'appareil.
+  Future<void> syncWithServer() async {
+    try {
+      final list = await api.getAny('/me/conversations') as List;
+      final remote = [for (final c in list.cast<Map<String, dynamic>>()) Conversation.fromJson(c)];
+      final byId = {for (final c in value) c.id: c};
+      for (final r in remote) {
+        final local = byId[r.id];
+        if (local == null || r.updatedAt.isAfter(local.updatedAt)) byId[r.id] = r;
+      }
+      final merged = byId.values.toList()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      value = merged.take(_max).toList();
+      _persist();
+    } catch (_) {/* hors ligne : on garde l'appareil */}
   }
 
   Future<void> clear() async {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/auth/auth_service.dart';
 import '../../core/auth/session.dart';
 import '../../core/config.dart';
 import '../../core/learning/learner_store.dart';
@@ -13,6 +14,7 @@ import '../../core/settings/app_settings.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/mark.dart';
 import '../../widgets/common.dart';
+import '../onboarding/account_dialog.dart';
 
 /// Ouvre les réglages : page entière sur téléphone, fenêtre centrée au-dessus
 /// de la conversation sur ordinateur (comme sur Claude).
@@ -131,6 +133,25 @@ class SettingsScreen extends StatelessWidget {
                           ),
                       ],
                     ),
+                    FutureBuilder<bool>(
+                      // Sans compte : proposer d'en créer un pour garder sa progression
+                      future: authService.isGuest(),
+                      builder: (ctx, g) => g.data == true && authService.googleEnabled
+                          ? CupertinoListSection.insetGrouped(
+                              backgroundColor: p.bg,
+                              header: const Text('SANS COMPTE'),
+                              footer: const Text('Ta progression et tes discussions sont gardées sur ton compte.'),
+                              children: [
+                                CupertinoListTile(
+                                  leading: const TintIcon(CupertinoIcons.person_crop_circle_badge_plus),
+                                  title: Text('Créer un compte', style: TextStyle(color: p.text)),
+                                  trailing: const CupertinoListTileChevron(),
+                                  onTap: () => showAccountDialog(ctx),
+                                ),
+                              ],
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                     CupertinoListSection.insetGrouped(
                       backgroundColor: p.bg,
                       header: const Text('COMPTE'),
@@ -157,7 +178,7 @@ class SettingsScreen extends StatelessWidget {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
-                      child: Text('Amusnaw · réalisé pour le HCA',
+                      child: Text('Amusnaw',
                           style: TextStyle(fontSize: 13, color: p.text2)),
                     ),
                   ]),

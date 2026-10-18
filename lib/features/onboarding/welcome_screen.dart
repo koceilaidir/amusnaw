@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_service.dart';
+import '../../core/auth/google_button.dart';
+import '../../core/chat/conversation_store.dart';
 import '../../core/config.dart';
 import '../../core/learning/learner_store.dart';
 import '../../core/locale/locale_controller.dart';
@@ -23,9 +27,27 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   bool _busy = false;
   bool _emailOn = false; // le serveur peut envoyer des codes par e-mail (Brevo)
 
+  StreamSubscription<AuthSession>? _webGoogle;
+
+  @override
+  void dispose() {
+    _webGoogle?.cancel();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    if (kIsWeb && authService.googleEnabled) {
+      // Site web : le bouton officiel de Google renvoie la session ici.
+      authService.initGoogleWeb();
+      _webGoogle = authService.webGoogleSessions.listen((s) {
+        if (!mounted) return;
+        learnerStore.setName(s.name);
+        conversationStore.syncWithServer();
+        _startOnboarding();
+      }, onError: (_) => _toast('La connexion Google a échoué. Réessaie.'));
+    }
     authService.methods().then((m) {
       if (mounted && m['email'] == true) setState(() => _emailOn = true);
     });
@@ -166,12 +188,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       ),
       const SizedBox(height: 12),
     ],
-    if (!kIsWeb) // sur le web, Google demande son propre bouton : prévu ensuite
-      OutlinedButton(
-        onPressed:
-            _busy ? null : () => _signIn(authService.signInWithGoogle),
-        child: const Text('Continuer avec Google'),
-      ),
+    if (authService.googleEnabled) ...[
+      GoogleButton(onPressed: _busy ? null : () => _signIn(authService.signInWithGoogle)),
+      const SizedBox(height: 12),
+    ],
     if (_emailOn) ...[
       OutlinedButton(
         onPressed: _busy ? null : _emailLogin,
@@ -219,7 +239,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               const Text('La langue, la culture et l’histoire — un petit pas par jour.',
                   style: TextStyle(fontSize: 19, color: Color(0xCCF8F6F1), height: 1.45)),
               const Spacer(),
-              const Text('Kabyle en écriture latine · Tifinagh · Sources HCA',
+              const Text('Kabyle en écriture latine · Tifinagh',
                   style: TextStyle(fontSize: 14, color: Color(0x99F8F6F1))),
             ]),
           ),

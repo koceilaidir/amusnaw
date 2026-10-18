@@ -19,6 +19,13 @@ Ce journal est tenu au fil du projet. Il sert de base au PDF de présentation de
 - **Menu rangeable** sur ordinateur (bouton en haut à gauche, choix retenu) ; **Réglages en fenêtre centrée** au-dessus de la conversation, comme sur Claude.
 - **Connexion par e-mail sans mot de passe** : code à 6 chiffres envoyé par Brevo (15 min, 5 essais), compte créé au premier passage ; activée dès que la clé Brevo est sur le serveur (`docs/EMAIL_BREVO.md`).
 - **Prof plus rapide** : modèle gardé en mémoire et préchargé au démarrage, consignes et historique réutilisés d'un message à l'autre (les références changeantes sont jointes au dernier message), réponses limitées à ~380 mots-jetons.
+- **Sans compte d'abord** (site web) : on utilise Amusnaw tout de suite ; après 4 messages, une fenêtre « Garde ta progression » propose un compte Google. Tout ce qui a été fait sans compte passe sur le compte (mots, discussions).
+- **Discussions enregistrées sur le serveur** : on les retrouve sur tous ses appareils.
+- **Copier** une réponse ou une question (bouton sous chaque message, texte sélectionnable).
+- **Réponses rapides** sous la réponse du prof (« Continuer », « Parlons d'autre chose »…).
+- **Le prof vérifie tes réponses** pendant la leçon : bravo, ou correction douce de l'orthographe (« tanemirt » → « tanemmirt »).
+- **Progression par unité** : les 13 unités A1, mots vus / total, unité en cours.
+- Les réponses ne citent plus d'ouvrages ni de sources (réglage `SHOW_SOURCES` pour les réactiver).
 - Sur le web : « Continuer sans compte » (Google viendra ensuite), pas de rappel quotidien (un navigateur ne programme pas de notification).
 - **Limites anti-abus** : 60 messages par heure et par élève, 10 nouveaux comptes par heure et par connexion ; l'élève reçoit un message bienveillant (« fais une petite pause »).
 

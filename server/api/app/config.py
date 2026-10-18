@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     dev_login: bool = False
     # Adresse de contact affichée dans la politique de confidentialité (/privacy)
     contact_email: str = ""
+    # Citer les ouvrages et bases d'origine dans les réponses (désactivé sur le site public)
+    show_sources: bool = False
     # Connexion par e-mail (code à 6 chiffres envoyé par Brevo)
     brevo_api_key: str = ""
     mail_from: str = ""            # ex. bonjour@amusnaw.dz (domaine validé chez Brevo)

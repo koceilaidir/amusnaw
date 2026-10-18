@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -36,6 +37,15 @@ Future<void> main() async {
   try {
     token = await authService.currentToken();
   } catch (_) {/* stockage sécurisé illisible : on redemande la connexion */}
+  // Site web : comme les autres IA, on peut utiliser Amusnaw tout de suite, sans compte.
+  // Un compte est proposé ensuite pour garder sa progression et ses discussions.
+  if (token == null && kIsWeb) {
+    try {
+      await authService.signInForTesting(name: '');
+      token = await authService.currentToken();
+    } catch (_) {/* serveur injoignable : l'accueil s'affiche */}
+  }
+  if (token != null) conversationStore.syncWithServer(); // discussions des autres appareils
   // Reprogramme le rappel (fuseau ou langue ont pu changer).
   final s = appSettings.value;
   if (s.reminderOn) {

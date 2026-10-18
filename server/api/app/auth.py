@@ -79,3 +79,52 @@ def current_user(
     if user is None:
         raise _unauthorized("Unknown user")
     return user
+
+
+def user_from_token(db: Session, token: str | None) -> User | None:
+    """Utilisateur d'un jeton Amusnaw (sans lever d'erreur s'il est invalide)."""
+    if not token:
+        return None
+    try:
+        claims = jwt.decode(token, get_settings().jwt_secret, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        return None
+    return db.get(User, claims.get("sub"))
+
+
+def link_guest(db: Session, guest: User | None, *, provider: str, sub: str, email: str | None,
+               name: str | None, language: str) -> User:
+    """Connexion Google d'un visiteur sans compte : sa progression et ses
+    discussions passent sur le compte (créé à partir du visiteur s'il est nouveau)."""
+    from .db import ChatMessage, LearnedWord, SavedConversation  # noqa: PLC0415
+    if guest is None or guest.provider != "dev":
+        return upsert_user(db, provider=provider, sub=sub, email=email, name=name, language=language)
+    existing = db.scalar(select(User).where(User.provider == provider, User.provider_sub == sub))
+    if existing is None:  # premier passage : le visiteur devient le compte
+        guest.provider, guest.provider_sub = provider, sub
+        guest.email = email or guest.email
+        guest.name = name or guest.name
+        db.commit()
+        return guest
+    # compte déjà existant : on y verse ce que le visiteur a fait
+    keys = set(db.scalars(select(LearnedWord.word_key).where(LearnedWord.user_id == existing.id)))
+    for w in db.scalars(select(LearnedWord).where(LearnedWord.user_id == guest.id)).all():
+        if w.word_key in keys:
+            db.delete(w)
+        else:
+            w.user_id = existing.id
+    convs = set(db.scalars(select(SavedConversation.client_id).where(SavedConversation.user_id == existing.id)))
+    for c in db.scalars(select(SavedConversation).where(SavedConversation.user_id == guest.id)).all():
+        if c.client_id in convs:
+            db.delete(c)
+        else:
+            c.user_id = existing.id
+    for m in db.scalars(select(ChatMessage).where(ChatMessage.user_id == guest.id)).all():
+        m.user_id = existing.id
+    profile = db.get(LearnerProfile, guest.id)
+    if profile:
+        db.delete(profile)
+    db.flush()
+    db.delete(guest)
+    db.commit()
+    return existing

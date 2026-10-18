@@ -80,6 +80,21 @@ class LearnedWord(Base):
     mastered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class SavedConversation(Base):
+    """Discussion enregistrée (telle que l'app l'affiche), pour la retrouver sur
+    un autre appareil. client_id = identifiant donné par l'app."""
+
+    __tablename__ = "conversations"
+    __table_args__ = (UniqueConstraint("user_id", "client_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    client_id: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(200), default="")
+    messages: Mapped[list] = mapped_column(JSON, default=list)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 class Review(Base):
     """Décision du linguiste sur une entrée de la base (mot ou paire)."""
 

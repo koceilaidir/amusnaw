@@ -269,11 +269,11 @@ class KnowledgeBase:
             lines.append("Vocabulaire :")
             lines += [f"- {w.kab} — {w.fr}" for w in words]
         if pairs:
-            lines.append("Phrases authentiques (tirées de livres traduits) :")
+            lines.append("Phrases authentiques :")
             lines += [f"- KAB : {p.kab}\n  FR : {p.fr}" for p in pairs]
         if texts:
-            lines.append("Exemples d'emploi dans des livres kabyles (sans traduction, à citer avec prudence) :")
-            lines += [f"- {t.kab} ({t.source})" for t in texts]
+            lines.append("Exemples d'emploi (sans traduction, à citer avec prudence) :")
+            lines += [f"- {t.kab}" for t in texts]
         return "\n".join(lines)
 
 
