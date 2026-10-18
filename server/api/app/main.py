@@ -184,12 +184,32 @@ class ChatIn(BaseModel):
     intent: str | None = Field(None, max_length=16)
 
 
+# Espace « Discuter » : conversation libre, traduction, correction (pas de leçon).
+TALK_MODES = {"talk", "translate", "correct"}
+
 INTENT_HINTS = {
     "learn": "\n\nL'élève vient de choisir « Apprendre » : propose tout de suite une petite "
              "activité sur la leçon en cours et termine par [[EXERCICE]].",
-    "talk": "\n\nL'élève vient de choisir « Discuter » : propose deux ou trois sujets de culture "
-            "ou d'histoire kabyles (fêtes, village, chansons, personnages) et laisse-le choisir.",
+    "talk": "\n\nMODE DISCUSSION (pas de leçon, pas d'exercice) : l'élève veut converser. Il écrit en "
+            "kabyle, en français, ou en mélangeant les deux. Réponds d'abord par une phrase courte et simple "
+            "en kabyle, en gras, prise dans les références ou parmi les formules très courantes (azul, labas, "
+            "tanemmirt, amek telliḍ…), puis sa traduction en français, puis une petite question pour "
+            "continuer. Si tu n'es pas sûr d'une phrase kabyle, dis-le et continue en français. "
+            "S'il parle de culture ou d'histoire kabyles, réponds simplement, comme dans une vraie discussion.",
+    "translate": "\n\nMODE TRADUCTION (pas de leçon, pas d'exercice) : traduis le texte de l'élève, du "
+                 "français vers le kabyle ou du kabyle vers le français. Donne d'abord la traduction en gras, "
+                 "sur une ligne. Ensuite, deux ou trois mots clés, un par ligne : « mot » : sens. N'utilise que "
+                 "le kabyle des références ; une partie que tu ne peux pas vérifier, écris-la entre crochets "
+                 "[à vérifier] au lieu d'inventer. Pas de question à la fin.",
+    "correct": "\n\nMODE CORRECTION (pas de leçon, pas d'exercice) : l'élève t'envoie du kabyle à corriger. "
+               "Donne d'abord la version corrigée en gras. Ensuite, chaque correction sur une ligne : "
+               "« ce qui était écrit » → « la bonne forme » : pourquoi, en une phrase. Si c'est déjà juste, "
+               "dis-le simplement et félicite-le. Si tu n'es pas sûr, dis-le honnêtement.",
 }
+
+# Plan de séance remplacé dans l'espace « Discuter »
+TALK_PLAN = ("Espace « Discuter » : l'élève ne suit pas de leçon ici. Ne propose ni leçon ni exercice, "
+             "ne termine pas par [[EXERCICE]].")
 
 
 def _prepare_turn(body: "ChatIn", user: User, db: Session):
@@ -201,12 +221,13 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session):
     if tutor.is_obviously_off_topic(body.message):
         return profile, newly_learned, None, None, None
     # 2. Réponse exacte écrite par le serveur (vocabulaire, conjugaison, hors sujet évident)
-    direct = router.direct_reply(body.message, user.interface_language)
+    talk = body.intent in TALK_MODES
+    direct = None if body.intent == "correct" else router.direct_reply(body.message, user.interface_language)
     if direct:
         return profile, newly_learned, None, None, direct
     # 3. Leçon guidée : « Apprendre », « continue », « autre chose »… le programme avance tout seul,
     #    et la réponse de l'élève à l'exercice est vérifiée (bravo, ou correction douce).
-    if user.interface_language == "fr":
+    if user.interface_language == "fr" and not talk:
         if body.intent != "learn" and (ans := guide.check_answer(user.id, body.message)):
             _SUGGEST[user.id] = ["Continuer", "Parlons d'autre chose"]
             return profile, newly_learned, None, None, ans
@@ -231,8 +252,8 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session):
     context = body.message + " " + (history[-1]["content"] if history else "")
     # Unité du programme : la première dont l'élève n'a pas encore vu tous les mots.
     seen = set(db.scalars(select(LearnedWord.word_key).where(LearnedWord.user_id == user.id)))
-    plan = content.session_plan(content.current_unit(seen))
-    if not history:
+    plan = TALK_PLAN if talk else content.session_plan(content.current_unit(seen))
+    if not history and not talk:
         plan = ("Premier échange : fais connaissance (niveau, objectifs, vécu), puis propose "
                 "la première activité.\n" + plan)
     system = tutor.build_system_prompt(
@@ -256,6 +277,8 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
     reply, markers = content.strip_markers(reply)
     if intent == "learn" and not any(k in ("EXERCICE", "EXERCISE") for k, _ in markers):
         markers.append(("EXERCICE", ""))  # « Apprendre » donne toujours un exercice
+    if intent in TALK_MODES:  # pas d'exercice dans l'espace « Discuter »
+        markers = [(k, v) for k, v in markers if k not in ("EXERCICE", "EXERCISE")]
     blocks = content.build_blocks(reply, markers, seed=f"{user.id}{len(reply)}") if not off_topic else []
     if not off_topic:
         # 2. Les mots kabyles employés par le prof sont « découverts » aujourd'hui.
@@ -277,7 +300,8 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
         "off_topic": off_topic,
         "learned": {"new": newly_learned, "total": learning.total_learned(db, user.id)},
         "blocks": blocks,
-        "suggestions": _SUGGEST.pop(user.id, None) or ([] if off_topic else ["Continuer la leçon"]),
+        "suggestions": _SUGGEST.pop(user.id, None) or ([] if off_topic or intent in TALK_MODES
+                                                        else ["Continuer la leçon"]),
     }
 
 

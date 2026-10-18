@@ -46,10 +46,33 @@ String learnedMessage(String lang, List<String> words, int total) {
   }
 }
 
+/// Les deux espaces de l'app : apprendre avec le programme, ou discuter librement.
+enum ChatMode { learn, talk }
+
+/// Dans « Discuter » : converser, faire traduire, faire corriger son kabyle.
+enum TalkKind {
+  conversation('Conversation', 'talk', 'Écris en kabyle, en français, ou les deux…',
+      ['Azul ! Amek telliḍ ?', 'Comment on dit « bon appétit » ?', 'Parle-moi de Yennayer']),
+  translate('Traduire', 'translate', 'Écris le texte à traduire…',
+      ['Bonjour, je m’appelle Koceila.', 'Tanemmirt aṭas', 'J’habite à Tizi Ouzou.']),
+  correct('Corriger mon kabyle', 'correct', 'Écris ton kabyle, je le corrige…',
+      ['Azul, isem-inu Koceila', 'Nekk ad lmadeɣ taqbaylit']);
+
+  const TalkKind(this.label, this.intent, this.hint, this.examples);
+  final String label, intent, hint;
+  final List<String> examples;
+}
+
+/// Une discussion de l'espace « Discuter » a un identifiant qui commence par « t- ».
+ChatMode modeOf(Conversation c) => c.id.startsWith('t-') ? ChatMode.talk : ChatMode.learn;
+
 /// Écran principal : l'app s'ouvre toujours ici, sur le chat avec le prof.
 /// Menu en haut à gauche (tiroir), apparence (clair/sombre) en haut à droite.
 class TutorChatScreen extends StatefulWidget {
-  const TutorChatScreen({super.key});
+  const TutorChatScreen({super.key, this.initialMode});
+
+  /// Choisi sur l'écran d'accueil ; sinon on reprend le dernier espace utilisé.
+  final ChatMode? initialMode;
 
   @override
   State<TutorChatScreen> createState() => _TutorChatScreenState();
@@ -65,7 +88,12 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   // Le clavier ne s'ouvre que si l'élève touche le champ de saisie.
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
-  late Conversation _conv = _blank();
+  late ChatMode _mode = widget.initialMode ?? ChatMode.learn;
+  TalkKind _talk = TalkKind.conversation;
+  late Conversation _conv = _blank(_mode);
+  // Programme A1 (unités et avancement), venu du serveur
+  List<Map<String, dynamic>> _units = const [];
+  int? _currentUnit;
   // Réponses rapides proposées par le serveur après la dernière réponse du prof
   List<String> _suggestions = const [];
   // Visiteur sans compte (site web) : on lui propose un compte après quelques messages
@@ -75,8 +103,8 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 
   List<ChatMsg> get _messages => _conv.messages;
 
-  static Conversation _blank() => Conversation(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+  static Conversation _blank([ChatMode mode = ChatMode.learn]) => Conversation(
+        id: '${mode == ChatMode.talk ? 't-' : ''}${DateTime.now().microsecondsSinceEpoch}',
         title: '',
         updatedAt: DateTime.now(),
         messages: [],
@@ -92,8 +120,33 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       if (mounted) setState(() => _guest = g);
     });
     SharedPreferences.getInstance().then((prefs) {
-      if (mounted) setState(() => _menuOpen = prefs.getBool('menu_open') ?? true);
+      if (!mounted) return;
+      setState(() {
+        _menuOpen = prefs.getBool('menu_open') ?? true;
+        if (widget.initialMode == null && prefs.getString('chat_mode') == 'talk' && _messages.isEmpty) {
+          _mode = ChatMode.talk;
+          _conv = _blank(_mode);
+        }
+      });
+      if (widget.initialMode != null) prefs.setString('chat_mode', widget.initialMode!.name);
     });
+  }
+
+  /// Passe d'un espace à l'autre (Apprendre / Discuter) : nouvelle discussion vide.
+  void _setMode(ChatMode m) {
+    if (m == _mode) return;
+    setState(() {
+      _mode = m;
+      _conv = _blank(m);
+      _suggestions = const [];
+    });
+    SharedPreferences.getInstance().then((prefs) => prefs.setString('chat_mode', m.name));
+    _dropFocus();
+  }
+
+  void _setTalk(TalkKind k) {
+    if (k == _talk) return;
+    setState(() => _talk = k);
   }
 
   Future<void> _maybeOfferAccount() async {
@@ -131,29 +184,44 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     try {
       final me = await authService.refresh();
       learnerStore.setName(me['name'] as String?);
-      final res = await api.get('/me/progress');
-      learnerStore.setLearnedTotal((res['words_learned'] as num).toInt());
+      await _loadUnits();
     } on RefreshException catch (e) {
       // Jeton expiré ou compte supprimé : retour à l'accueil.
       if (e.status == 401 && mounted) await endSession(context);
     } catch (_) {/* hors ligne : on garde les valeurs locales */}
   }
 
+  /// Avancement dans le programme A1 (barre de l'unité, parcours dans le menu).
+  Future<void> _loadUnits() async {
+    final res = await api.get('/me/progress');
+    learnerStore.setLearnedTotal((res['words_learned'] as num).toInt());
+    if (!mounted) return;
+    setState(() {
+      _units = ((res['units'] as List?) ?? const []).cast<Map<String, dynamic>>();
+      _currentUnit = (res['current_unit'] as num?)?.toInt();
+    });
+  }
+
   void _newChat() {
     setState(() {
-      _conv = _blank();
+      _conv = _blank(_mode);
       _today = contentRepository.today(refresh: true);
     });
   }
 
   void _openConversation(Conversation c) {
-    setState(() => _conv = c);
+    setState(() {
+      _conv = c;
+      _mode = modeOf(c);
+    });
     _dropFocus();
   }
 
   Future<void> _send(String raw, {String? intent}) async {
     final text = raw.trim();
     if (text.isEmpty || _sending) return;
+    // Dans « Discuter », chaque message dit au serveur ce qu'on attend : discussion, traduction, correction.
+    intent ??= _mode == ChatMode.talk ? _talk.intent : null;
     _input.clear();
     FocusScope.of(context).unfocus();
     final conv = _conv;
@@ -250,6 +318,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
             });
             conversationStore.save(conv);
             _maybeOfferAccount();
+            if (_mode == ChatMode.learn) _loadUnits().catchError((_) {});
           case 'error':
             throw ApiException(503, ev['message'] as String? ?? '');
         }
@@ -379,6 +448,10 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       guest: _guest,
       onAccount: _offerAccount,
       docked: wide,
+      mode: _mode,
+      onMode: _setMode,
+      units: _units,
+      currentUnit: _currentUnit,
     );
     return Scaffold(
       key: _scaffold,
@@ -462,16 +535,22 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                   ],
                 ),
               ),
+              if (_mode == ChatMode.talk)
+                _TalkBar(kind: _talk, onChanged: _setTalk)
+              else if (!empty && _currentUnit != null && _currentUnit! < _units.length)
+                _UnitBar(unit: _units[_currentUnit!], index: _currentUnit!),
               Expanded(
                 child: ReadingWidth(child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
                   child: empty
-                      ? _Home(
-                          key: const ValueKey('home'),
-                          today: _today,
-                          onLearn: () => _send('Je veux apprendre', intent: 'learn'),
-                          onTalk: () => _send('J’aimerais discuter', intent: 'talk'),
-                        )
+                      ? (_mode == ChatMode.talk
+                          ? _TalkHome(key: ValueKey('talk-${_talk.name}'), kind: _talk)
+                          : _Home(
+                              key: const ValueKey('home'),
+                              today: _today,
+                              onLearn: () => _send('Je veux apprendre', intent: 'learn'),
+                              onTalk: () => _setMode(ChatMode.talk),
+                            ))
                       : _MessageList(
                           key: ValueKey(_conv.id),
                           messages: _messages,
@@ -483,10 +562,12 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
               ReadingWidth(child: _Composer(
                 controller: _input,
                 sending: _sending,
-                topics: empty ? _topics : _suggestions,
+                topics: empty ? (_mode == ChatMode.talk ? _talk.examples : _topics) : _suggestions,
                 onSend: () => _send(_input.text),
-                onTopic: (t) => _send(t, intent: empty ? 'talk' : null),
+                onTopic: (t) => _send(t),
                 focusNode: _inputFocus,
+                hint: _mode == ChatMode.talk ? _talk.hint : (empty ? 'Écris ton message…' : 'Écris ta réponse…'),
+                note: _mode == ChatMode.talk ? 'L’IA peut se tromper en kabyle : vérifie les phrases importantes.' : null,
               )),
             ],
           ),
@@ -567,8 +648,8 @@ class _Home extends StatelessWidget {
                   _ChoiceCard(
                     tile: p.fill,
                     icon: Icon(CupertinoIcons.chat_bubble_2, color: p.text, size: 24),
-                    title: 'Discuter',
-                    subtitle: 'Culture, histoire, chansons',
+                    title: 'Discuter avec l’IA',
+                    subtitle: 'En kabyle, en français, traduire, corriger',
                     onTap: onTalk,
                   ),
                 ],
@@ -820,9 +901,13 @@ class _Composer extends StatelessWidget {
     required this.onSend,
     required this.onTopic,
     required this.focusNode,
+    this.hint = 'Écris ton message…',
+    this.note,
   });
   final TextEditingController controller;
   final FocusNode focusNode;
+  final String hint;
+  final String? note;
   final bool sending;
   final List<String> topics;
   final VoidCallback onSend;
@@ -860,7 +945,7 @@ class _Composer extends StatelessWidget {
                   decoration: InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
-                    hintText: 'Écris ton message…',
+                    hintText: hint,
                     hintStyle: TextStyle(color: p.text2, fontSize: 16),
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
@@ -909,6 +994,10 @@ class _Composer extends StatelessWidget {
               ),
             ),
           ),
+        ],
+        if (note != null) ...[
+          const SizedBox(height: 8),
+          Text(note!, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.text2)),
         ],
       ]),
     );
@@ -1007,7 +1096,15 @@ class _AppDrawer extends StatelessWidget {
     this.guest = false,
     this.onAccount,
     this.docked = false,
+    required this.mode,
+    required this.onMode,
+    this.units = const [],
+    this.currentUnit,
   });
+  final ChatMode mode;
+  final ValueChanged<ChatMode> onMode;
+  final List<Map<String, dynamic>> units;
+  final int? currentUnit;
   final bool docked;
   final bool guest;
   final VoidCallback? onAccount;
@@ -1057,7 +1154,33 @@ class _AppDrawer extends StatelessWidget {
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: -.4, color: p.text)),
                 ]),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
+              // Les deux espaces : Apprendre (programme A1) ou Discuter (libre, traduire, corriger)
+              SizedBox(
+                width: double.infinity,
+                child: CupertinoSlidingSegmentedControl<ChatMode>(
+                  groupValue: mode,
+                  backgroundColor: p.fill,
+                  thumbColor: p.surface,
+                  padding: const EdgeInsets.all(4),
+                  onValueChanged: (m) {
+                    if (m == null) return;
+                    close();
+                    onMode(m);
+                  },
+                  children: {
+                    ChatMode.learn: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text('Apprendre', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.text)),
+                    ),
+                    ChatMode.talk: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text('Discuter', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.text)),
+                    ),
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
               FilledButton.icon(
                 onPressed: () {
                   close();
@@ -1065,31 +1188,55 @@ class _AppDrawer extends StatelessWidget {
                 },
                 style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
                 icon: const Icon(CupertinoIcons.pencil, size: 18),
-                label: const Text('Nouvelle conversation'),
+                label: Text(mode == ChatMode.talk ? 'Nouvelle discussion' : 'Nouvelle conversation'),
               ),
               const SizedBox(height: 10),
-              row(CupertinoIcons.book, 'Leçons', trailing: 'A1', onTap: () => onPush(const LearnScreen())),
-              row(CupertinoIcons.sun_min, 'Mot du jour', onTap: onWordOfDay),
-              row(CupertinoIcons.arrow_2_circlepath, 'Réviser mes mots', onTap: onReview),
-              row(CupertinoIcons.house, 'Culture et histoire', onTap: () => onPush(const CultureScreen())),
-              row(CupertinoIcons.chart_bar_alt_fill, 'Progression',
-                  trailing: '${s.learnedTotal} mot${s.learnedTotal > 1 ? 's' : ''}',
-                  onTap: () => onPush(const ProgressScreen())),
+              if (mode == ChatMode.learn) ...[
+                row(CupertinoIcons.arrow_2_circlepath, 'Réviser mes mots', onTap: onReview),
+                row(CupertinoIcons.sun_min, 'Mot du jour', onTap: onWordOfDay),
+                row(CupertinoIcons.chart_bar_alt_fill, 'Progression',
+                    trailing: '${s.learnedTotal} mot${s.learnedTotal > 1 ? 's' : ''}',
+                    onTap: () => onPush(const ProgressScreen())),
+                row(CupertinoIcons.house, 'Culture et histoire', onTap: () => onPush(const CultureScreen())),
+              ] else ...[
+                row(CupertinoIcons.sun_min, 'Mot du jour', onTap: onWordOfDay),
+                row(CupertinoIcons.house, 'Culture et histoire', onTap: () => onPush(const CultureScreen())),
+              ],
               Container(height: .5, margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), color: p.separator),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
-                child: Text('Récents', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: p.text2)),
-              ),
               Expanded(
                 child: ValueListenableBuilder(
                   valueListenable: conversationStore,
-                  builder: (context, list, _) => list.isEmpty
-                      ? Padding(
+                  builder: (context, all, _) {
+                    final list = all.where((c) => modeOf(c) == mode).toList();
+                    Widget header(String t) => Padding(
+                          padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
+                          child: Text(t, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: p.text2)),
+                        );
+                    return ListView(padding: EdgeInsets.zero, children: [
+                      if (mode == ChatMode.learn && units.isNotEmpty) ...[
+                        header('Ton parcours A1'),
+                        for (var i = 0; i < units.length; i++)
+                          _UnitRow(
+                            unit: units[i],
+                            index: i,
+                            current: i == currentUnit,
+                            onTap: () {
+                              close();
+                              onPush(const LearnScreen());
+                            },
+                          ),
+                        const SizedBox(height: 12),
+                      ],
+                      header('Récents'),
+                      if (list.isEmpty)
+                        Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Text('Tes conversations apparaîtront ici.',
+                          child: Text(
+                              mode == ChatMode.talk
+                                  ? 'Tes discussions apparaîtront ici.'
+                                  : 'Tes leçons apparaîtront ici.',
                               style: TextStyle(fontSize: 14, color: p.text2)),
-                        )
-                      : ListView(padding: EdgeInsets.zero, children: [
+                        ),
                           for (final c in list)
                             GestureDetector(
                               onTap: () {
@@ -1110,7 +1257,8 @@ class _AppDrawer extends StatelessWidget {
                                     style: TextStyle(fontSize: 16, color: p.text)),
                               ),
                             ),
-                        ]),
+                    ]);
+                  },
                 ),
               ),
               Padding(
@@ -1183,6 +1331,219 @@ class _AppDrawer extends StatelessWidget {
   }
 }
 
+
+/// Une unité du parcours A1 dans le menu : coche si finie, numéro sinon, barre si en cours.
+class _UnitRow extends StatelessWidget {
+  const _UnitRow({required this.unit, required this.index, required this.current, required this.onTap});
+  final Map<String, dynamic> unit;
+  final int index;
+  final bool current;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final total = (unit['total'] as num?)?.toInt() ?? 0;
+    final seen = (unit['seen'] as num?)?.toInt() ?? 0;
+    final done = total > 0 && seen >= total;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          color: current ? p.fill : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(children: [
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: done ? p.accent : (current ? p.text : p.fill),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: done
+                ? Icon(CupertinoIcons.checkmark_alt, size: 15, color: p.onAccent)
+                : Text('${index + 1}',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700, color: current ? p.bg : p.text2)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(unit['title'] as String? ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: current ? FontWeight.w600 : FontWeight.w400,
+                      color: current || done ? p.text : p.text2)),
+              if (current && total > 0) ...[
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: seen / total,
+                    minHeight: 4,
+                    backgroundColor: p.separator,
+                    color: p.accent,
+                  ),
+                ),
+              ],
+            ]),
+          ),
+          if (current && total > 0) ...[
+            const SizedBox(width: 10),
+            Text('$seen/$total', style: TextStyle(fontSize: 12, color: p.accentText)),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+/// « Apprendre » : l'unité en cours et son avancement, au-dessus de la conversation.
+class _UnitBar extends StatelessWidget {
+  const _UnitBar({required this.unit, required this.index});
+  final Map<String, dynamic> unit;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final total = (unit['total'] as num?)?.toInt() ?? 0;
+    final seen = (unit['seen'] as num?)?.toInt() ?? 0;
+    final narrow = MediaQuery.sizeOf(context).width < 520;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Flexible(
+          child: Text('Unité ${index + 1} · ${unit['title'] ?? ''}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: p.text)),
+        ),
+        if (total > 0) ...[
+          const SizedBox(width: 12),
+          SizedBox(
+            width: narrow ? 70 : 140,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: seen / total,
+                minHeight: 6,
+                backgroundColor: p.separator,
+                color: p.accent,
+              ),
+            ),
+          ),
+          if (!narrow) ...[
+            const SizedBox(width: 12),
+            Text('$seen mot${seen > 1 ? 's' : ''} sur $total', style: TextStyle(fontSize: 14, color: p.text2)),
+          ],
+        ],
+      ]),
+    );
+  }
+}
+
+/// « Discuter » : choisir entre conversation, traduction et correction.
+class _TalkBar extends StatelessWidget {
+  const _TalkBar({required this.kind, required this.onChanged});
+  final TalkKind kind;
+  final ValueChanged<TalkKind> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(color: p.fill, borderRadius: BorderRadius.circular(999)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              for (final k in TalkKind.values)
+                Semantics(
+                  button: true,
+                  selected: k == kind,
+                  child: GestureDetector(
+                    onTap: () => onChanged(k),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: k == kind ? p.surface : Colors.transparent,
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: k == kind ? p.shadow : null,
+                      ),
+                      child: Text(k.label,
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: k == kind ? FontWeight.w600 : FontWeight.w500,
+                              color: k == kind ? p.text : p.text2)),
+                    ),
+                  ),
+                ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Accueil de « Discuter », selon ce qu'on veut faire.
+class _TalkHome extends StatelessWidget {
+  const _TalkHome({super.key, required this.kind});
+  final TalkKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final (title, text) = switch (kind) {
+      TalkKind.conversation => (
+          'Parle-moi en kabyle.',
+          'En kabyle, en français, ou en mélangeant les deux : je te réponds en kabyle simple, avec la traduction.'
+        ),
+      TalkKind.translate => (
+          'Traduire un texte.',
+          'Écris une phrase en français ou en kabyle : je la traduis et je t’explique les mots importants.'
+        ),
+      TalkKind.correct => (
+          'Corriger ton kabyle.',
+          'Écris une phrase en kabyle : je te renvoie la bonne version et je t’explique chaque correction.'
+        ),
+    };
+    return LayoutBuilder(
+      builder: (context, box) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: box.maxHeight - 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AmusnawMark(size: 30, color: p.accent),
+              const SizedBox(height: 12),
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 32, fontWeight: FontWeight.w500, letterSpacing: -.8, height: 1.1, color: p.text)),
+              const SizedBox(height: 12),
+              Text(text, style: TextStyle(fontSize: 17, height: 1.45, color: p.text2)),
+              const SizedBox(height: 8),
+              Text('Ou touche un exemple juste en dessous.', style: TextStyle(fontSize: 15, color: p.text2)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Pendant que le prof réfléchit : l'étoile d'Amusnaw tourne et respire doucement.
 class _ThinkingMark extends StatefulWidget {
