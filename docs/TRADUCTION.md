@@ -41,6 +41,57 @@ Premier repère, sans NLLB, en prenant la phrase humaine la plus proche :
 
 Le score « quotidien » de ce repère est flatteur : Tatoeba contient beaucoup de phrases presque identiques.
 
+## Premiers résultats de NLLB (19 octobre 2026)
+
+| Sens | Phrase humaine la plus proche | NLLB |
+|---|---|---|
+| français → kabyle, quotidien | 31,7 | **35,5** |
+| français → kabyle, livres | 18,9 | **26,9** |
+| kabyle → français, quotidien | 44,7 | **47,9** |
+| kabyle → français, livres | 20,7 | **33,2** |
+
+NLLB comprend bien le kabyle (vers le français), mais écrit un kabyle approximatif. Défauts vus : « grand-mère » traduit par « ma femme », noms de lieux en français (Tizi Ouzou).
+
+## Étape 2 : entraîner amusnaw-mt (gratuit, sur Kaggle)
+
+### 1. Fabriquer les données (sur le PC)
+
+```powershell
+cd C:\Users\Lenovo\OneDrive\Bureau\Minerva\IA\amusnaw\data_pipeline
+python build_mt_dataset.py ..\data ..\data\mt
+```
+
+Résultat : `data\mt\amusnaw-mt-data.zip` (environ 25 Mo). Il contient :
+- environ 240 000 paires humaines ;
+- environ 870 000 phrases kabyles humaines ;
+- le banc d'essai, dont les phrases sont retirées de tout le reste.
+
+### 2. Lancer l'entraînement sur Kaggle
+
+1. Créer un compte sur kaggle.com et valider le numéro de téléphone (obligatoire pour avoir le GPU et Internet).
+2. **Datasets → New Dataset** : envoyer `amusnaw-mt-data.zip`, nom `amusnaw-mt-data`, visibilité **Private**.
+3. **Code → New Notebook → File → Import Notebook** : `training/amusnaw_mt_kaggle.ipynb`.
+4. Panneau de droite :
+   - *Accelerator* : **GPU T4 x2** ;
+   - *Internet* : **On** ;
+   - *Add Input* : le dataset `amusnaw-mt-data`.
+5. **Save Version → Save & Run All (Commit)**. Le calcul tourne seul (8 à 10 h), même ordinateur éteint.
+6. À la fin, onglet **Output** : télécharger `amusnaw-mt-ct2.zip` (environ 600 Mo) et lire `rapport.json` (scores avant et après).
+
+### 3. Mettre amusnaw-mt sur le VPS (seulement s'il fait mieux que NLLB)
+
+```powershell
+scp amusnaw-mt-ct2.zip root@5.39.119.109:/opt/amusnaw/
+```
+```bash
+cd /opt/amusnaw && mkdir -p models/amusnaw-mt && cd models/amusnaw-mt && unzip -o ../../amusnaw-mt-ct2.zip
+cd /opt/amusnaw/server
+echo "MT_MODEL_DIR=/models_custom/amusnaw-mt" >> .env
+docker compose --profile mt up -d mt
+docker compose exec api python -m app.eval_translate
+```
+Pour revenir à NLLB de base : retirer la ligne `MT_MODEL_DIR` de `.env`, puis `docker compose --profile mt up -d mt`.
+
 ## La suite : notre propre modèle
 
 1. **Fabrique de données** : paires humaines nettoyées, plus des paires obtenues par rétro-traduction (vrai kabyle humain traduit vers le français par NLLB). On n'entraîne jamais sur du kabyle écrit par une machine.

@@ -52,7 +52,11 @@ services:
     profiles: ["mt"]
     restart: unless-stopped
     environment:
-      OMP_NUM_THREADS: "2"
+      OMP_NUM_THREADS: ${MT_THREADS:-2}
+      # Notre modèle réentraîné (amusnaw-mt) : MT_MODEL_DIR=/models_custom/amusnaw-mt dans .env
+      MODEL_DIR: ${MT_MODEL_DIR:-/models/nllb}
+    volumes:
+      - ../models:/models_custom:ro
 
   # HTTPS automatique (Let's Encrypt) devant l'API.
   caddy:

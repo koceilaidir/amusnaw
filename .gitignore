@@ -21,3 +21,6 @@ android/key.properties
 
 # Site web construit (flutter build web), copié sur le VPS à part
 server/web/
+
+# Modèles entraînés (gros fichiers, copiés sur le VPS à part)
+models/
