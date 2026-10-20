@@ -24,3 +24,15 @@ server/web/
 
 # ModÃ¨les entraÃ®nÃ©s (gros fichiers, copiÃ©s sur le VPS Ã  part)
 models/
+
+# Modèles exportés de Kaggle
+amusnaw-mt-*.zip
+
+# Modèles exportés de Kaggle
+amusnaw-mt-*.zip
+
+# Modèles exportés de Kaggle
+amusnaw-mt-*.zip
+
+# Modèles exportés de Kaggle
+amusnaw-mt-*.zip

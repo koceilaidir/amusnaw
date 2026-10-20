@@ -76,7 +76,7 @@ Résultat : `data\mt\amusnaw-mt-data.zip` (environ 25 Mo). Il contient :
    - *Internet* : **On** ;
    - *Add Input* : le dataset `amusnaw-mt-data`.
 5. **Save Version → Save & Run All (Commit)**. Le calcul tourne seul (8 à 10 h), même ordinateur éteint.
-6. À la fin, onglet **Output** : télécharger `amusnaw-mt-ct2.zip` (environ 600 Mo) et lire `rapport.json` (scores avant et après).
+6. À la fin, onglet **Output** : lire `rapport.json` (scores avant et après), puis télécharger `amusnaw-mt-ct2.zip` (format du serveur, environ 600 Mo). S'il n'y est pas, la conversion n'a pas marché sur Kaggle : télécharger `amusnaw-mt-hf.zip` (environ 1,2 Go) et suivre « Conversion sur le VPS » ci-dessous.
 
 ### 3. Mettre amusnaw-mt sur le VPS (seulement s'il fait mieux que NLLB)
 
@@ -90,6 +90,19 @@ echo "MT_MODEL_DIR=/models_custom/amusnaw-mt" >> .env
 docker compose --profile mt up -d mt
 docker compose exec api python -m app.eval_translate
 ```
+**Conversion sur le VPS** (seulement si Kaggle n'a fourni que `amusnaw-mt-hf.zip`) :
+```powershell
+scp amusnaw-mt-hf.zip root@5.39.119.109:/opt/amusnaw/
+```
+```bash
+cd /opt/amusnaw && mkdir -p models && unzip -o amusnaw-mt-hf.zip -d models/amusnaw-mt-hf
+cd server && docker build --target convert -t amusnaw-convert ./mt
+docker compose stop ollama
+docker run --rm -v /opt/amusnaw/models:/m amusnaw-convert sh -c "ct2-transformers-converter --model /m/amusnaw-mt-hf --output_dir /m/amusnaw-mt --quantization int8 --force && python -c \"from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('facebook/nllb-200-distilled-600M').save_pretrained('/m/amusnaw-mt')\""
+docker compose start ollama
+```
+Puis les trois dernières commandes ci-dessus (`MT_MODEL_DIR`, redémarrage de `mt`, banc d'essai).
+
 Pour revenir à NLLB de base : retirer la ligne `MT_MODEL_DIR` de `.env`, puis `docker compose --profile mt up -d mt`.
 
 ## La suite : notre propre modèle

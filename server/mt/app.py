@@ -16,7 +16,9 @@ from transformers import AutoTokenizer
 MODEL_DIR = os.environ.get("MODEL_DIR", "/models/nllb")
 LANGS = {"fra_Latn", "kab_Latn", "eng_Latn"}
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+# Le découpage en mots ne change pas pendant notre entraînement (vocabulaire figé) :
+# on prend toujours celui de NLLB de base, livré avec l'image.
+tokenizer = AutoTokenizer.from_pretrained(os.environ.get("TOKENIZER_DIR", "/models/nllb"))
 translator = ctranslate2.Translator(MODEL_DIR, device="cpu", compute_type="int8",
                                     intra_threads=int(os.environ.get("OMP_NUM_THREADS", "2")))
 _lock = threading.Lock()  # le tokenizer change de langue source : une requête à la fois
