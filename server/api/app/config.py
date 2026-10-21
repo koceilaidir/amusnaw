@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     llm_base_url: str = "http://ollama:11434/v1"
     llm_api_key: str = "ollama"
     llm_model: str = "qwen2.5:7b"
+    # Modèle spécialisé pour « Corrige… » (ex. amusnaw-v1). Vide = le modèle principal.
+    llm_model_correct: str = ""
     prompts_dir: str = "/app/prompts"
     data_dir: str = "/app/data"
     content_dir: str = "/app/content"

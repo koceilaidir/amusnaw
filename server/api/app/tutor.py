@@ -98,6 +98,12 @@ def _ollama_url() -> str | None:
 OLLAMA_OPTIONS = {"temperature": 0.4, "num_ctx": 4096, "num_predict": MAX_REPLY_TOKENS}
 
 
+def model_for(intent: str | None) -> str:
+    """Le modèle qui répond : un modèle spécialisé pour les corrections, sinon le principal."""
+    s = get_settings()
+    return s.llm_model_correct if intent == "correct" and s.llm_model_correct else s.llm_model
+
+
 async def warm_up() -> None:
     """Charge le modèle en mémoire au démarrage et l'y garde (pas d'attente au 1er message)."""
     url = _ollama_url()
@@ -106,7 +112,8 @@ async def warm_up() -> None:
     try:
         # pas de limite de lecture : si on raccroche, Ollama abandonne le chargement
         async with httpx.AsyncClient(timeout=httpx.Timeout(None, connect=10)) as client:
-            await client.post(f"{url}/api/generate", json={"model": get_settings().llm_model, "prompt": "Azul",
+            for name in dict.fromkeys(m for m in (get_settings().llm_model, get_settings().llm_model_correct) if m):
+                await client.post(f"{url}/api/generate", json={"model": name, "prompt": "Azul",
                                                             "keep_alive": -1,
                                                             # même contexte que les vraies réponses, sinon Ollama recharge le modèle
                                                             "options": {**OLLAMA_OPTIONS, "num_predict": 1}})
@@ -115,15 +122,16 @@ async def warm_up() -> None:
         print(f"[llm] préchauffage impossible : {e}", flush=True)
 
 
-async def stream_model(system: str, history: list[dict], message: str):
+async def stream_model(system: str, history: list[dict], message: str, model: str | None = None):
     """Génère la réponse morceau par morceau."""
     s = get_settings()
+    name = model or s.llm_model
     messages = _messages(system, history, message)
     url = _ollama_url()
     async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=10)) as client:
         if url:  # Ollama : API native (modèle gardé en mémoire, contexte réglé)
             async with client.stream("POST", f"{url}/api/chat", json={
-                "model": s.llm_model, "messages": messages, "stream": True,
+                "model": name, "messages": messages, "stream": True,
                 "keep_alive": -1, "options": OLLAMA_OPTIONS,
             }) as r:
                 r.raise_for_status()
@@ -143,7 +151,7 @@ async def stream_model(system: str, history: list[dict], message: str):
         async with client.stream(  # tout serveur compatible OpenAI (vLLM, API…)
             "POST", f"{s.llm_base_url}/chat/completions",
             headers={"Authorization": f"Bearer {s.llm_api_key}"},
-            json={"model": s.llm_model, "messages": messages, "temperature": 0.4, "stream": True,
+            json={"model": name, "messages": messages, "temperature": 0.4, "stream": True,
                   "max_tokens": MAX_REPLY_TOKENS},
         ) as r:
             r.raise_for_status()
@@ -161,6 +169,6 @@ async def stream_model(system: str, history: list[dict], message: str):
                     yield delta
 
 
-async def ask_model(system: str, history: list[dict], message: str) -> str:
-    parts = [p async for p in stream_model(system, history, message)]
+async def ask_model(system: str, history: list[dict], message: str, model: str | None = None) -> str:
+    parts = [p async for p in stream_model(system, history, message, model)]
     return "".join(parts).strip()

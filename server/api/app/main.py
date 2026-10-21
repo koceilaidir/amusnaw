@@ -304,7 +304,7 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
                  off_topic: bool, newly_learned: list[str], intent: str | None = None,
                  system: str = "") -> dict:
     """Ce qui suit la réponse : blocs, mots découverts, historique, total."""
-    model = None if off_topic else get_settings().llm_model
+    model = None if off_topic else tutor.model_for(intent)
     reply, markers = content.strip_markers(reply)
     if intent == "learn" and not any(k in ("EXERCICE", "EXERCISE") for k, _ in markers):
         markers.append(("EXERCICE", ""))  # « Apprendre » donne toujours un exercice
@@ -363,7 +363,7 @@ async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = D
         reply = tutor.off_topic_reply(user.interface_language)
         return _finish_turn(db, user, profile, body.message, reply, True, newly)
     try:
-        reply = _trim_unfinished(await tutor.ask_model(system, history, body.message))
+        reply = _trim_unfinished(await tutor.ask_model(system, history, body.message, tutor.model_for(body.intent)))
     except Exception as e:  # modèle indisponible
         raise HTTPException(503, "Tutor is unavailable, try again shortly.") from e
     return _finish_turn(db, user, profile, body.message, reply, False, newly, body.intent, system)
@@ -399,7 +399,7 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
         parts: list[str] = []
         sent = 0  # caractères déjà envoyés ; on n'envoie jamais une balise [[…]]
         try:
-            async for piece in tutor.stream_model(system, history, body.message):
+            async for piece in tutor.stream_model(system, history, body.message, tutor.model_for(body.intent)):
                 parts.append(piece)
                 full = "".join(parts)
                 cut = full.find("[[")

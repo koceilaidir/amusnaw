@@ -37,7 +37,19 @@ Ce qu'on a vu sur les questions types :
   - « isem-inu Koceila » : faute de possessif, un type de faute qu'il n'a pas appris ;
   - Yennayer : faits inventés. Les questions de culture sont donc désormais servies par les fiches vérifiées (`router.capsule_reply`).
 
+**En ligne, le défaut principal est apparu tout de suite :**
+- à « Azul ! Amek telliḍ ? » ou « oui », il répond « On continue ? » ;
+- **cause 1** : les données ne contenaient aucune vraie discussion libre ;
+- **cause 2** : 81 réponses passe-partout « On continue ? » venaient des leçons simulées ;
+- **cause 3** : le long prompt du serveur n'était présent que dans 6 % des exemples, et surtout dans les leçons.
+
+Décision : Qwen de base reste le modèle de discussion (`LLM_MODEL=qwen2.5:3b`), et amusnaw-v1 ne répond qu'aux demandes de correction (`LLM_MODEL_CORRECT=amusnaw-v1`), où il fait 60 % de corrections parfaites contre 0 %.
+
 Pistes pour la v2 :
+- **de vraies discussions**, en kabyle simple, à partir des dialogues du programme et de dialogues relus par un linguiste ;
+- **des exemples où Qwen garde ses réponses d'origine** sur des questions générales, pour qu'il n'oublie pas comment discuter ;
+- **le prompt du serveur** dans une grande partie des exemples ;
+- plus aucune réponse passe-partout ;
 - entraîner jusqu'au bout, en reprenant là où la v1 s'est arrêtée ;
 - ajouter des réponses « je ne sais pas » pour les faits absents de la base ;
 - ajouter les fautes de possessif (inu → iw) et de genre ;

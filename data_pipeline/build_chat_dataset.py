@@ -240,8 +240,9 @@ def lessons(n_learners=40):
                 if rng.random() < 0.4:  # petite faute d'orthographe
                     c = corrupt(attempt)
                     attempt = c[0] if c else attempt
-                reply = guide.check_answer(uid, attempt) or "On continue ?"
-                msgs += [{"role": "user", "content": attempt}, {"role": "assistant", "content": reply}]
+                reply = guide.check_answer(uid, attempt)
+                if reply:  # pas de réponse passe-partout : amusnaw-v1 répondait « On continue ? » à tout
+                    msgs += [{"role": "user", "content": attempt}, {"role": "assistant", "content": reply}]
         if len(msgs) > 2:
             out.append({"messages": msgs, "kind": "leçon"})
     return out
