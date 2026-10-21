@@ -11,6 +11,7 @@ import '../../core/api/api_client.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/auth/session.dart';
 import '../../core/chat/conversation_store.dart';
+import '../../core/config.dart';
 import '../../core/content/content_repository.dart';
 import '../../core/learning/learner_store.dart';
 import '../../core/learning/review.dart';
@@ -21,6 +22,7 @@ import '../../theme/filigree.dart';
 import '../../widgets/common.dart';
 import '../../theme/mark.dart';
 import '../../widgets/content_cards.dart';
+import '../../widgets/dialogs.dart';
 import '../culture/culture_screen.dart';
 import '../exercise/exercise_screen.dart';
 import '../learn/learn_screen.dart';
@@ -46,30 +48,19 @@ String learnedMessage(String lang, List<String> words, int total) {
   }
 }
 
-/// Les deux espaces de l'app : apprendre avec le programme, ou discuter librement.
-enum ChatMode { learn, talk }
-
-/// Exemples proposés sous le champ de saisie, dans « Discuter ».
-/// Pas d'onglets : on demande simplement ce qu'on veut (« traduis… », « corrige… »).
-const _talkExamples = ['Azul ! Amek telliḍ ?', 'Traduis : bonjour, je m’appelle Koceila', 'Corrige : isem-inu Koceila'];
-
-/// Une discussion de l'espace « Discuter » a un identifiant qui commence par « t- ».
-ChatMode modeOf(Conversation c) => c.id.startsWith('t-') ? ChatMode.talk : ChatMode.learn;
-
 /// Écran principal : l'app s'ouvre toujours ici, sur le chat avec le prof.
 /// Menu en haut à gauche (tiroir), apparence (clair/sombre) en haut à droite.
 class TutorChatScreen extends StatefulWidget {
-  const TutorChatScreen({super.key, this.initialMode});
-
-  /// Choisi sur l'écran d'accueil ; sinon on reprend le dernier espace utilisé.
-  final ChatMode? initialMode;
+  const TutorChatScreen({super.key});
 
   @override
   State<TutorChatScreen> createState() => _TutorChatScreenState();
 }
 
 class _TutorChatScreenState extends State<TutorChatScreen> {
-  static const _topics = ['Une chanson kabyle', 'Yennayer', 'Le village', 'Les prénoms amazighs'];
+  // Exemples sous le champ de saisie : on peut tout demander, comme à une autre IA
+  static const _topics = ['Que veut dire tamurt ?', 'Traduis : bonjour, je m’appelle Koceila', 'Corrige : ur ččiɣ',
+      'Parle-moi de Yennayer'];
 
   final _scaffold = GlobalKey<ScaffoldState>();
   // Ordinateur : menu de gauche ouvert ou rangé (retenu d'une visite à l'autre)
@@ -78,22 +69,21 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   // Le clavier ne s'ouvre que si l'élève touche le champ de saisie.
   final _inputFocus = FocusNode();
   final _scroll = ScrollController();
-  late ChatMode _mode = widget.initialMode ?? ChatMode.learn;
-  late Conversation _conv = _blank(_mode);
+  Conversation _conv = _blank();
   // Programme A1 (unités et avancement), venu du serveur
   List<Map<String, dynamic>> _units = const [];
   int? _currentUnit;
+  int _wordsSeen = 0; // mots du programme déjà rencontrés
   // Réponses rapides proposées par le serveur après la dernière réponse du prof
   List<String> _suggestions = const [];
   // Visiteur sans compte (site web) : on lui propose un compte après quelques messages
   bool _guest = false;
-  late Future<TodayContent> _today = contentRepository.today();
   bool _sending = false;
 
   List<ChatMsg> get _messages => _conv.messages;
 
-  static Conversation _blank([ChatMode mode = ChatMode.learn]) => Conversation(
-        id: '${mode == ChatMode.talk ? 't-' : ''}${DateTime.now().microsecondsSinceEpoch}',
+  static Conversation _blank() => Conversation(
+        id: '${DateTime.now().microsecondsSinceEpoch}',
         title: '',
         updatedAt: DateTime.now(),
         messages: [],
@@ -110,27 +100,8 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     });
     SharedPreferences.getInstance().then((prefs) {
       if (!mounted) return;
-      setState(() {
-        _menuOpen = prefs.getBool('menu_open') ?? true;
-        if (widget.initialMode == null && prefs.getString('chat_mode') == 'talk' && _messages.isEmpty) {
-          _mode = ChatMode.talk;
-          _conv = _blank(_mode);
-        }
-      });
-      if (widget.initialMode != null) prefs.setString('chat_mode', widget.initialMode!.name);
+      setState(() => _menuOpen = prefs.getBool('menu_open') ?? true);
     });
-  }
-
-  /// Passe d'un espace à l'autre (Apprendre / Discuter) : nouvelle discussion vide.
-  void _setMode(ChatMode m) {
-    if (m == _mode) return;
-    setState(() {
-      _mode = m;
-      _conv = _blank(m);
-      _suggestions = const [];
-    });
-    SharedPreferences.getInstance().then((prefs) => prefs.setString('chat_mode', m.name));
-    _dropFocus();
   }
 
 
@@ -184,29 +155,25 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     setState(() {
       _units = ((res['units'] as List?) ?? const []).cast<Map<String, dynamic>>();
       _currentUnit = (res['current_unit'] as num?)?.toInt();
+      _wordsSeen = (res['words_seen'] as num?)?.toInt() ?? 0;
     });
   }
 
   void _newChat() {
     setState(() {
-      _conv = _blank(_mode);
-      _today = contentRepository.today(refresh: true);
+      _conv = _blank();
+      _suggestions = const [];
     });
   }
 
   void _openConversation(Conversation c) {
-    setState(() {
-      _conv = c;
-      _mode = modeOf(c);
-    });
+    setState(() => _conv = c);
     _dropFocus();
   }
 
   Future<void> _send(String raw, {String? intent}) async {
     final text = raw.trim();
     if (text.isEmpty || _sending) return;
-    // Dans « Discuter », chaque message dit au serveur ce qu'on attend : discussion, traduction, correction.
-    intent ??= _mode == ChatMode.talk ? 'talk' : null;
     _input.clear();
     FocusScope.of(context).unfocus();
     final conv = _conv;
@@ -303,7 +270,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
             });
             conversationStore.save(conv);
             _maybeOfferAccount();
-            if (_mode == ChatMode.learn) _loadUnits().catchError((_) {});
+            _loadUnits().catchError((_) {});
           case 'error':
             throw ApiException(503, ev['message'] as String? ?? '');
         }
@@ -359,8 +326,8 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 
   Future<void> _push(Widget screen) async {
     _dropFocus();
-    await Navigator.of(context, rootNavigator: true).push(CupertinoPageRoute(
-      builder: (ctx) => Material(
+    await Navigator.of(context, rootNavigator: true).push(appRoute(
+      (ctx) => Material(
         color: AppPalette.of(ctx).bg,
         child: isWide(ctx) ? ReadingWidth(maxWidth: 820, child: screen) : screen,
       ),
@@ -374,46 +341,37 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     showWordSheet(context, t.word ?? wordOfTheDay);
   }
 
-  void _review() {
+  /// « Réviser mes mots » : d'abord les cartes à revoir aujourd'hui (rappel espacé),
+  /// sinon les mots déjà croisés dans les leçons, préparés par le serveur.
+  Future<void> _review() async {
     _dropFocus();
-    final ex = reviewExercises(learnerStore.value.cards.values.toList());
+    var ex = reviewExercises(learnerStore.value.cards.values.toList());
     if (ex.isEmpty) {
-      showCupertinoDialog<void>(
-        context: context,
-        builder: (ctx) => CupertinoAlertDialog(
-          title: const Text('Rien à réviser'),
-          content: const Text('Tes mots sont encore frais. Ils reviendront ici au bon moment.'),
-          actions: [CupertinoDialogAction(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-        ),
-      );
+      try {
+        final res = await api.get('/learning/review');
+        ex = [
+          for (final e in (res['exercises'] as List? ?? const []))
+            ChoiceExercise.fromJson((e as Map).cast<String, dynamic>()),
+        ];
+      } catch (_) {
+        ex = const [];
+      }
+    }
+    if (!mounted) return;
+    if (ex.isEmpty) {
+      await showInfo(context, 'Rien à réviser pour l’instant',
+          'Commence une leçon : les mots que tu découvres reviendront ici pour que tu les gardes en mémoire.');
       return;
     }
-    Navigator.of(context, rootNavigator: true).push(CupertinoPageRoute(
-      fullscreenDialog: true,
-      builder: (_) => ExerciseScreen(lesson: Lesson(id: 'review', title: 'Révision', subtitle: '', exercises: ex)),
+    await Navigator.of(context, rootNavigator: true).push(appRoute(
+      (_) => ExerciseScreen(lesson: Lesson(id: 'review', title: 'Révision', subtitle: '', exercises: ex)),
     ));
   }
 
-  void _themeMenu() {
-    final top = MediaQuery.paddingOf(context).top + 60;
-    showGeneralDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Fermer',
-      barrierColor: const Color(0x1F141210),
-      transitionDuration: const Duration(milliseconds: 180),
-      pageBuilder: (ctx, _, __) => Stack(children: [
-        Positioned(top: top, right: 20, child: const _ThemeMenu()),
-      ]),
-      transitionBuilder: (ctx, anim, _, child) => FadeTransition(
-        opacity: anim,
-        child: ScaleTransition(
-          alignment: Alignment.topRight,
-          scale: Tween(begin: .92, end: 1.0).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
-          child: child,
-        ),
-      ),
-    );
+  /// Bouton en haut à droite : passe directement du clair au sombre (et inversement).
+  void _toggleTheme() {
+    final dark = AppPalette.of(context).isDark;
+    appSettings.setThemeMode(dark ? ThemeMode.light : ThemeMode.dark);
   }
 
   // ---------- Interface ----------
@@ -433,8 +391,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       guest: _guest,
       onAccount: _offerAccount,
       docked: wide,
-      mode: _mode,
-      onMode: _setMode,
+      wordsSeen: _wordsSeen,
       units: _units,
       currentUnit: _currentUnit,
     );
@@ -513,27 +470,25 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, letterSpacing: -.3, color: p.text)),
                       ]),
                     RoundIconButton(
-                      label: 'Apparence',
-                      icon: Icon(p.isDark ? CupertinoIcons.moon : CupertinoIcons.sun_max, size: 20, color: p.text),
-                      onPressed: _themeMenu,
+                      label: p.isDark ? 'Passer en mode clair' : 'Passer en mode sombre',
+                      icon: Icon(p.isDark ? CupertinoIcons.sun_max : CupertinoIcons.moon, size: 20, color: p.text),
+                      onPressed: _toggleTheme,
                     ),
                   ],
                 ),
               ),
-              if (_mode == ChatMode.learn && !empty && _currentUnit != null && _currentUnit! < _units.length)
+              if (!empty && _currentUnit != null && _currentUnit! < _units.length)
                 _UnitBar(unit: _units[_currentUnit!], index: _currentUnit!),
               Expanded(
                 child: ReadingWidth(child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
                   child: empty
-                      ? (_mode == ChatMode.talk
-                          ? const _TalkHome(key: ValueKey('talk'))
-                          : _Home(
-                              key: const ValueKey('home'),
-                              today: _today,
-                              onLearn: () => _send('Je veux apprendre', intent: 'learn'),
-                              onTalk: () => _setMode(ChatMode.talk),
-                            ))
+                      ? _Home(
+                          key: const ValueKey('home'),
+                          unit: _currentUnit != null && _currentUnit! < _units.length ? _units[_currentUnit!] : null,
+                          unitIndex: _currentUnit,
+                          onLearn: () => _send('Je veux apprendre', intent: 'learn'),
+                        )
                       : _MessageList(
                           key: ValueKey(_conv.id),
                           messages: _messages,
@@ -545,14 +500,12 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
               ReadingWidth(child: _Composer(
                 controller: _input,
                 sending: _sending,
-                topics: empty ? (_mode == ChatMode.talk ? _talkExamples : _topics) : _suggestions,
+                topics: empty ? _topics : _suggestions,
                 onSend: () => _send(_input.text),
                 onTopic: (t) => _send(t),
                 focusNode: _inputFocus,
-                hint: _mode == ChatMode.talk
-                    ? 'Écris en kabyle, en français, ou les deux…'
-                    : (empty ? 'Écris ton message…' : 'Écris ta réponse…'),
-                note: _mode == ChatMode.talk ? 'L’IA peut se tromper en kabyle : vérifie les phrases importantes.' : null,
+                hint: empty ? 'Pose une question, ou écris en kabyle…' : 'Écris ta réponse, ou pose une question…',
+                note: 'L’IA peut se tromper : vérifie les phrases importantes.',
               )),
             ],
           ),
@@ -567,9 +520,12 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 // ---------- Accueil : « On apprend, ou on parle d'autre chose ? » ----------
 
 class _Home extends StatelessWidget {
-  const _Home({super.key, required this.today, required this.onLearn, required this.onTalk});
-  final Future<TodayContent> today;
-  final VoidCallback onLearn, onTalk;
+  const _Home({super.key, required this.onLearn, this.unit, this.unitIndex});
+  final VoidCallback onLearn;
+
+  /// Unité en cours du programme A1 (null tant que le serveur n'a pas répondu).
+  final Map<String, dynamic>? unit;
+  final int? unitIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -588,14 +544,10 @@ class _Home extends StatelessWidget {
                 TextSpan(text: recent.first, style: hl),
                 if (recent.length > 1) ...[const TextSpan(text: ' et '), TextSpan(text: recent.last, style: hl)],
                 const TextSpan(text: '.'),
-                if (s.learnedTotal > 0) ...[
-                  const TextSpan(text: ' Tu as déjà '),
-                  TextSpan(
-                      text: '${s.learnedTotal} mot${s.learnedTotal > 1 ? 's' : ''}',
-                      style: TextStyle(color: p.text, fontWeight: FontWeight.w600)),
-                  const TextSpan(text: ' en poche.'),
-                ],
               ];
+        final seen = (unit?['seen'] as num?)?.toInt() ?? 0;
+        final total = (unit?['total'] as num?)?.toInt() ?? 0;
+        final started = seen > 0 || (unitIndex ?? 0) > 0;
         return LayoutBuilder(
           builder: (context, box) => SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
@@ -609,33 +561,28 @@ class _Home extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text(s.name.isEmpty ? 'Azul.' : 'Azul, ${s.name}.',
                       style: TextStyle(
-                          fontSize: 32, fontWeight: FontWeight.w500, letterSpacing: -.8, height: 1.1, color: p.text)),
+                          fontSize: 34, fontWeight: FontWeight.w500, letterSpacing: -.9, height: 1.1, color: p.text)),
                   const SizedBox(height: 12),
                   Text.rich(TextSpan(children: recap),
                       style: TextStyle(fontSize: 17, height: 1.45, color: p.text2)),
-                  const SizedBox(height: 12),
-                  Text('On apprend, ou on parle d’autre chose ?',
-                      style: TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.w600, height: 1.25, letterSpacing: -.4, color: p.text)),
-                  const SizedBox(height: 22),
-                  FutureBuilder<TodayContent>(
-                    future: today,
-                    builder: (context, snap) => _ChoiceCard(
-                      tile: p.accent,
-                      icon: Icon(CupertinoIcons.book, color: p.onAccent, size: 24),
-                      title: 'Apprendre',
-                      badge: '8 min',
-                      subtitle: snap.data?.lessonTitle ?? 'La leçon du jour',
-                      onTap: onLearn,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 24),
                   _ChoiceCard(
-                    tile: p.fill,
-                    icon: Icon(CupertinoIcons.chat_bubble_2, color: p.text, size: 24),
-                    title: 'Discuter avec l’IA',
-                    subtitle: 'En kabyle, en français, traduire, corriger',
-                    onTap: onTalk,
+                    tile: p.accent,
+                    icon: Icon(CupertinoIcons.book, color: p.onAccent, size: 24),
+                    title: started ? 'Continuer ma leçon' : 'Commencer ma première leçon',
+                    badge: unitIndex == null ? 'A1' : 'Unité ${unitIndex! + 1}',
+                    subtitle: unit == null
+                        ? '5 minutes, à ton rythme'
+                        : '${unit!['title'] ?? ''}${total > 0 ? ' · $seen mot${seen > 1 ? 's' : ''} sur $total' : ''}',
+                    onTap: onLearn,
+                  ),
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                        'Tu peux aussi me poser une question à tout moment : le sens d’un mot, une traduction, '
+                        'une correction, la culture kabyle.',
+                        style: TextStyle(fontSize: 14.5, height: 1.45, color: p.text2)),
                   ),
                 ],
               ),
@@ -661,11 +608,13 @@ class _ChoiceCard extends StatelessWidget {
     final p = AppPalette.of(context);
     return Semantics(
       button: true,
-      child: GestureDetector(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
         onTap: onTap,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 76),
-          padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+          constraints: const BoxConstraints(minHeight: 80),
+          padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
           decoration: cardDecoration(p),
           child: Row(children: [
             Container(
@@ -679,7 +628,12 @@ class _ChoiceCard extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: p.text)),
+                  Flexible(
+                    child: Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: p.text)),
+                  ),
                   if (badge != null) ...[
                     const SizedBox(width: 8),
                     Container(
@@ -692,12 +646,13 @@ class _ChoiceCard extends StatelessWidget {
                 ]),
                 const SizedBox(height: 3),
                 Text(subtitle,
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.text2)),
+                    maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: p.text2)),
               ]),
             ),
             Icon(CupertinoIcons.chevron_right, size: 16, color: p.text2),
           ]),
         ),
+      ),
       ),
     );
   }
@@ -943,7 +898,7 @@ class _Composer extends StatelessWidget {
               color: ready ? p.accent : p.fill,
               onTap: ready ? onSend : null,
               child: sending
-                  ? CupertinoActivityIndicator(radius: 8, color: p.text2)
+                  ? Spinner(size: 16, color: p.text2)
                   : Icon(CupertinoIcons.arrow_up, size: 20, color: ready ? p.onAccent : p.text2),
             ),
           ]),
@@ -980,10 +935,9 @@ class _Composer extends StatelessWidget {
             ),
           ),
         ],
-        if (note != null) ...[
-          const SizedBox(height: 8),
-          Text(note!, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.text2)),
-        ],
+        const SizedBox(height: 8),
+        Text(note == null ? AppConfig.aiName : '${AppConfig.aiName} · $note',
+            textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: p.text2)),
       ]),
     );
   }
@@ -1015,59 +969,6 @@ class _Circle extends StatelessWidget {
       );
 }
 
-// ---------- Apparence (en haut à droite) ----------
-
-class _ThemeMenu extends StatelessWidget {
-  const _ThemeMenu();
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: appSettings,
-      builder: (context, s, _) {
-        final p = AppPalette.of(context);
-        Widget mode(ThemeMode m, String label) => GestureDetector(
-              onTap: () => appSettings.setThemeMode(m),
-              child: Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: s.themeMode == m ? p.fill : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(children: [
-                  Expanded(child: Text(label, style: TextStyle(fontSize: 16, color: p.text))),
-                  if (s.themeMode == m) Icon(CupertinoIcons.checkmark_alt, size: 18, color: p.text),
-                ]),
-              ),
-            );
-        return Material(
-          color: Colors.transparent,
-          child: Container(
-            width: 236,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: p.panel,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: p.separator, width: .5),
-              boxShadow: const [BoxShadow(color: Color(0x38141210), blurRadius: 50, offset: Offset(0, 18))],
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-                child: Text('Apparence', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: p.text2)),
-              ),
-              mode(ThemeMode.system, 'Automatique'),
-              mode(ThemeMode.light, 'Clair'),
-              mode(ThemeMode.dark, 'Sombre'),
-            ]),
-          ),
-        );
-      },
-    );
-  }
-}
-
 // ---------- Menu (en haut à gauche) ----------
 
 class _AppDrawer extends StatelessWidget {
@@ -1081,13 +982,11 @@ class _AppDrawer extends StatelessWidget {
     this.guest = false,
     this.onAccount,
     this.docked = false,
-    required this.mode,
-    required this.onMode,
+    this.wordsSeen = 0,
     this.units = const [],
     this.currentUnit,
   });
-  final ChatMode mode;
-  final ValueChanged<ChatMode> onMode;
+  final int wordsSeen;
   final List<Map<String, dynamic>> units;
   final int? currentUnit;
   final bool docked;
@@ -1104,20 +1003,21 @@ class _AppDrawer extends StatelessWidget {
     void close() {
       if (!docked) Navigator.of(context).pop();
     }
-    Widget row(IconData icon, String label, {String? trailing, required VoidCallback onTap}) => GestureDetector(
-          behavior: HitTestBehavior.opaque,
+    Widget row(IconData icon, String label, {String? trailing, required VoidCallback onTap}) => InkWell(
+          borderRadius: BorderRadius.circular(14),
+          hoverColor: p.fill,
           onTap: () {
             close();
             onTap();
           },
           child: SizedBox(
-            height: 48,
+            height: 46,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(children: [
-                Icon(icon, size: 22, color: p.text),
+                Icon(icon, size: 21, color: p.text),
                 const SizedBox(width: 14),
-                Expanded(child: Text(label, style: TextStyle(fontSize: 16, color: p.text))),
+                Expanded(child: Text(label, style: TextStyle(fontSize: 15.5, color: p.text))),
                 if (trailing != null) Text(trailing, style: TextStyle(fontSize: 13, color: p.text2)),
               ]),
             ),
@@ -1139,66 +1039,35 @@ class _AppDrawer extends StatelessWidget {
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: -.4, color: p.text)),
                 ]),
               ),
-              const SizedBox(height: 16),
-              // Les deux espaces : Apprendre (programme A1) ou Discuter (libre, traduire, corriger)
-              SizedBox(
-                width: double.infinity,
-                child: CupertinoSlidingSegmentedControl<ChatMode>(
-                  groupValue: mode,
-                  backgroundColor: p.fill,
-                  thumbColor: p.surface,
-                  padding: const EdgeInsets.all(4),
-                  onValueChanged: (m) {
-                    if (m == null) return;
-                    close();
-                    onMode(m);
-                  },
-                  children: {
-                    ChatMode.learn: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text('Apprendre', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.text)),
-                    ),
-                    ChatMode.talk: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text('Discuter', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.text)),
-                    ),
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 18),
               FilledButton.icon(
                 onPressed: () {
                   close();
                   onNewChat();
                 },
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
                 icon: const Icon(CupertinoIcons.pencil, size: 18),
-                label: Text(mode == ChatMode.talk ? 'Nouvelle discussion' : 'Nouvelle conversation'),
+                label: const Text('Nouvelle conversation'),
               ),
               const SizedBox(height: 10),
-              if (mode == ChatMode.learn) ...[
-                row(CupertinoIcons.arrow_2_circlepath, 'Réviser mes mots', onTap: onReview),
-                row(CupertinoIcons.sun_min, 'Mot du jour', onTap: onWordOfDay),
-                row(CupertinoIcons.chart_bar_alt_fill, 'Progression',
-                    trailing: '${s.learnedTotal} mot${s.learnedTotal > 1 ? 's' : ''}',
-                    onTap: () => onPush(const ProgressScreen())),
-                row(CupertinoIcons.house, 'Culture et histoire', onTap: () => onPush(const CultureScreen())),
-              ] else ...[
-                row(CupertinoIcons.sun_min, 'Mot du jour', onTap: onWordOfDay),
-                row(CupertinoIcons.house, 'Culture et histoire', onTap: () => onPush(const CultureScreen())),
-              ],
+              row(CupertinoIcons.arrow_2_circlepath, 'Réviser mes mots', onTap: onReview),
+              row(CupertinoIcons.sun_min, 'Mot du jour', onTap: onWordOfDay),
+              row(CupertinoIcons.chart_bar_alt_fill, 'Progression',
+                  trailing: '$wordsSeen mot${wordsSeen > 1 ? 's' : ''}',
+                  onTap: () => onPush(const ProgressScreen())),
+              row(CupertinoIcons.house, 'Culture et histoire', onTap: () => onPush(const CultureScreen())),
               Container(height: .5, margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), color: p.separator),
               Expanded(
                 child: ValueListenableBuilder(
                   valueListenable: conversationStore,
                   builder: (context, all, _) {
-                    final list = all.where((c) => modeOf(c) == mode).toList();
+                    final list = all;
                     Widget header(String t) => Padding(
                           padding: const EdgeInsets.fromLTRB(10, 4, 10, 6),
                           child: Text(t, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: p.text2)),
                         );
                     return ListView(padding: EdgeInsets.zero, children: [
-                      if (mode == ChatMode.learn && units.isNotEmpty) ...[
+                      if (units.isNotEmpty) ...[
                         header('Ton parcours A1'),
                         for (var i = 0; i < units.length; i++)
                           _UnitRow(
@@ -1216,10 +1085,7 @@ class _AppDrawer extends StatelessWidget {
                       if (list.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Text(
-                              mode == ChatMode.talk
-                                  ? 'Tes discussions apparaîtront ici.'
-                                  : 'Tes leçons apparaîtront ici.',
+                          child: Text('Tes conversations apparaîtront ici.',
                               style: TextStyle(fontSize: 14, color: p.text2)),
                         ),
                           for (final c in list)
@@ -1430,41 +1296,6 @@ class _UnitBar extends StatelessWidget {
           ],
         ],
       ]),
-    );
-  }
-}
-
-/// Accueil de « Discuter » : on parle, et on demande ce qu'on veut.
-class _TalkHome extends StatelessWidget {
-  const _TalkHome({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    const title = 'Parle-moi en kabyle.';
-    const text = 'En kabyle, en français, ou en mélangeant les deux. Tu peux aussi me demander de traduire '
-        'un texte ou de corriger ton kabyle : demande simplement ce que tu veux.';
-    return LayoutBuilder(
-      builder: (context, box) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: box.maxHeight - 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AmusnawMark(size: 30, color: p.accent),
-              const SizedBox(height: 12),
-              Text(title,
-                  style: TextStyle(
-                      fontSize: 32, fontWeight: FontWeight.w500, letterSpacing: -.8, height: 1.1, color: p.text)),
-              const SizedBox(height: 12),
-              Text(text, style: TextStyle(fontSize: 17, height: 1.45, color: p.text2)),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

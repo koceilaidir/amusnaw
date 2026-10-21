@@ -4,66 +4,103 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Amusnaw · Relecture</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&family=Noto+Serif&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Noto+Sans+Tifinagh&display=swap" rel="stylesheet">
 <style>
+  /* Mêmes couleurs que l'app (lib/theme/app_theme.dart) : tons pierre chauds, vert olivier */
   :root {
-    --bg: #F2F2F7; --surface: #FFFFFF; --text: #000; --text2: #6C6C70; --sep: #D1D1D6;
-    --accent: #2F54C8; --green: #1F7A35; --greenSoft: #E2F3E6; --red: #B3261E; --redSoft: #FBE9E7;
-    --gold: #7A5A12; --goldSoft: #F6EEDB;
+    --bgTop: #EFE7DC; --bg: #F6F4F0; --surface: #FFFFFF; --fill: #EEEBE5; --text: #1D1B18; --text2: #6B675F;
+    --sep: #E3DED5; --ink: #1D1B18; --onInk: #FAF8F4;
+    --accent: #56662E; --accentText: #4E5C29; --accentSoft: #E7ECD9; --onAccent: #FFFFFF;
+    --gold: #7A5A12; --goldSoft: #F4ECD9; --green: #2A7448; --greenSoft: #E1EFE5; --red: #9C3B2E; --redSoft: #F6E4DF;
+    --shadow: 0 1px 2px rgba(29,27,24,.05), 0 6px 20px rgba(29,27,24,.05);
+    --wash: .35;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #000; --surface: #1C1C1E; --text: #fff; --text2: #AEAEB2; --sep: #38383A;
-      --accent: #7D97F5; --green: #30D158; --greenSoft: #0E2A17; --red: #FF6B60; --redSoft: #3A1512;
-      --gold: #E6C27A; --goldSoft: #2A2416;
+      --bgTop: #231F1B; --bg: #141312; --surface: #1E1D1B; --fill: #2B2926; --text: #F3EFE8; --text2: #ABA59C;
+      --sep: #36332F; --ink: #F3EFE8; --onInk: #141312;
+      --accent: #A9BD72; --accentText: #A9BD72; --accentSoft: #283020; --onAccent: #1A120C;
+      --gold: #E0BC74; --goldSoft: #2E2717; --green: #7BC897; --greenSoft: #1E2E24; --red: #F08A7A; --redSoft: #3A1F1A;
+      --shadow: none; --wash: .08;
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font-family: -apple-system, BlinkMacSystemFont, "Noto Sans", sans-serif; }
-  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 80px; }
-  h1 { font-size: 30px; margin: 8px 0 4px; }
-  .sub { color: var(--text2); margin: 0 0 20px; }
-  .card { background: var(--surface); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  html { background: var(--bg); }
+  body { margin: 0; min-height: 100vh; color: var(--text); font-family: "Onest", system-ui, sans-serif;
+         background: linear-gradient(180deg, var(--bgTop) 0, var(--bg) 320px); -webkit-font-smoothing: antialiased; }
+  /* aquarelle discrète en bas de page, comme dans le chat */
+  body::before { content: ""; position: fixed; inset: auto 0 0 0; height: 55vh; z-index: -1; pointer-events: none;
+         background: url("/assets/assets/fonds/brume.webp") center bottom / cover no-repeat; opacity: var(--wash); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 20px 16px 80px; }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+  header svg { width: 30px; height: 30px; color: var(--accent); }
+  header .brand { font-weight: 600; font-size: 19px; letter-spacing: -.4px; }
+  header .pill { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--accentText);
+         background: var(--accentSoft); padding: 6px 12px; border-radius: 999px; }
+  h1 { font-size: 34px; font-weight: 500; letter-spacing: -1px; margin: 0 0 6px; }
+  .sub { color: var(--text2); margin: 0 0 22px; line-height: 1.5; max-width: 620px; }
+  .card { background: var(--surface); border: 1px solid var(--sep); border-radius: 20px; padding: 18px;
+          margin-bottom: 12px; box-shadow: var(--shadow); transition: opacity .2s; }
+  .card:focus-within, .card:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  input, textarea, select { font: inherit; color: var(--text); background: var(--bg);
-         border: 1px solid var(--sep); border-radius: 10px; padding: 10px 12px; }
-  textarea { width: 100%; resize: vertical; min-height: 48px; }
-  textarea.kab { font-family: "Noto Serif", serif; font-size: 17px; }
-  button { font: inherit; font-weight: 600; border: none; border-radius: 10px; padding: 10px 14px;
-           cursor: pointer; min-height: 44px; }
+  input, textarea, select { font: inherit; font-size: 16px; color: var(--text); background: var(--fill);
+         border: 1px solid transparent; border-radius: 12px; padding: 11px 14px; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+  textarea { width: 100%; resize: vertical; min-height: 50px; line-height: 1.45; }
+  textarea.kab { font-size: 18px; font-weight: 500; }
+  button { font: inherit; font-weight: 600; font-size: 15px; border: none; border-radius: 12px; padding: 11px 16px;
+           cursor: pointer; min-height: 44px; transition: transform .1s, filter .15s; }
+  button:hover { filter: brightness(.97); }
+  button:active { transform: scale(.98); }
+  button:disabled { cursor: default; transform: none; }
   .ok { background: var(--greenSoft); color: var(--green); }
-  .fix { background: var(--accent); color: #fff; }
+  .fix { background: var(--accent); color: var(--onAccent); }
   .rej { background: var(--redSoft); color: var(--red); }
-  .ghost { background: transparent; color: var(--accent); }
-  .tag { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
+  .ghost { background: transparent; color: var(--accentText); }
+  .tag { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
   .doubt { background: var(--goldSoft); color: var(--gold); }
   .src { font-size: 12px; color: var(--text2); }
-  label { font-size: 12px; font-weight: 600; color: var(--text2); display: block; margin: 10px 0 4px; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
-  .stat b { font-size: 22px; display: block; }
-  .stat span { font-size: 12px; color: var(--text2); }
-  .seg { display: inline-flex; background: var(--sep); border-radius: 10px; padding: 2px; }
-  .seg button { background: transparent; color: var(--text); min-height: 36px; padding: 6px 14px; font-weight: 500; }
-  .seg button.on { background: var(--surface); font-weight: 600; }
-  .hint { font-size: 13px; color: var(--text2); }
+  label { font-size: 12px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; color: var(--text2);
+          display: block; margin: 14px 0 6px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  .stat b { font-size: 26px; font-weight: 500; letter-spacing: -.5px; display: block; }
+  .stat span { font-size: 13px; color: var(--text2); }
+  .seg { display: inline-flex; background: var(--fill); border-radius: 12px; padding: 3px; }
+  .seg button { background: transparent; color: var(--text2); min-height: 38px; padding: 6px 16px; font-weight: 500; }
+  .seg button.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+  .hint { font-size: 13px; color: var(--text2); line-height: 1.5; }
   .done { opacity: .45; }
-  #login { max-width: 420px; }
+  #login { max-width: 440px; padding: 24px; }
+  #login input { width: 100%; }
+  #login .fix { width: 100%; margin-top: 16px; }
+  .err { color: var(--red); font-size: 14px; margin-top: 10px; }
+  .question { font-size: 16px; line-height: 1.5; background: var(--accentSoft); color: var(--text);
+              border-radius: 12px; padding: 12px 14px; white-space: pre-wrap; }
+  kbd { font-family: inherit; font-size: 12px; background: var(--fill); border-radius: 6px; padding: 1px 6px; }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <header>
+    <svg viewBox="-4 -1 108 100" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="11"
+         stroke-linecap="round" stroke-linejoin="round">
+      <path d="M36 18 L71 70 Q76 78 80 71 L91 57"/><path d="M64 18 L29 70 Q24 78 20 71 L9 57"/>
+      <path d="M21 36 L39 55"/><path d="M79 36 L61 55"/>
+    </svg>
+    <span class="brand">Amusnaw</span>
+    <span class="pill" id="who-pill">Relecture</span>
+  </header>
   <h1>Relecture</h1>
-  <p class="sub">Base kabyle d'Amusnaw — validez, corrigez ou rejetez chaque entrée. Les entrées validées servent au prof tout de suite, puis à l'entraînement.</p>
+  <p class="sub">Aidez le prof à parler un kabyle juste. Pour chaque entrée : validez-la, corrigez-la ou rejetez-la. Les entrées validées servent au prof tout de suite, puis à l'entraînement de son modèle.</p>
 
   <div id="login" class="card" hidden>
-    <label for="tok">Code de relecture</label>
-    <div class="row">
-      <input id="tok" type="password" autocomplete="current-password" style="flex:1">
-      <button class="fix" onclick="saveToken()">Entrer</button>
-    </div>
-    <label for="who">Votre nom (facultatif)</label>
-    <input id="who" style="width:100%">
+    <label for="tok" style="margin-top:0">Code de relecture</label>
+    <input id="tok" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')saveToken()">
+    <label for="who">Votre prénom</label>
+    <input id="who" autocomplete="given-name" onkeydown="if(event.key==='Enter')saveToken()">
+    <button class="fix" onclick="saveToken()">Commencer la relecture</button>
+    <div class="err" id="err" hidden>Code incorrect. Vérifiez-le et réessayez.</div>
   </div>
 
   <div id="app" hidden>
@@ -73,6 +110,7 @@
       <div class="seg" role="tablist">
         <button id="t-pair" class="on" onclick="setKind('pair')">Phrases</button>
         <button id="t-word" onclick="setKind('word')">Mots</button>
+        <button id="t-qa" onclick="setKind('qa')">Questions</button>
       </div>
       <label for="status" style="margin:0 0 0 8px">Statut</label>
       <select id="status" onchange="load()">
@@ -83,7 +121,7 @@
       </select>
       <input id="q" placeholder="Rechercher…" oninput="debounce()" style="flex:1; min-width: 160px">
     </div>
-    <p class="hint">Les entrées douteuses (alignement incertain) apparaissent en premier. Raccourcis sur la carte active : <b>V</b> valider · <b>R</b> rejeter.</p>
+    <p class="hint" id="hint">Les entrées douteuses (alignement incertain) apparaissent en premier. Raccourcis sur la carte active : <kbd>V</kbd> juste · <kbd>R</kbd> rejeter.</p>
     <div id="list"></div>
     <button class="ghost" onclick="load()">Charger la suite</button>
   </div>
@@ -91,6 +129,7 @@
 
 <script>
   let token = "", reviewer = "", kind = "pair", timer = null, active = null;
+  const HINT = "Les entrées douteuses (alignement incertain) apparaissent en premier. Raccourcis sur la carte active : V juste · R rejeter.";
   try { token = localStorage.getItem("review_token") || ""; reviewer = localStorage.getItem("reviewer") || ""; } catch (e) {}
 
   function saveToken() {
@@ -102,11 +141,13 @@
 
   async function api(path, opts = {}) {
     const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", "X-Review-Token": token } });
-    if (res.status === 401) { showLogin(); throw new Error("401"); }
+    if (res.status === 401) { showLogin(!!token); throw new Error("401"); }
     return res.json();
   }
 
-  function showLogin() {
+  function showLogin(bad) {
+    document.getElementById("err").hidden = !bad;
+    document.getElementById("who").value = reviewer;
     document.getElementById("login").hidden = false;
     document.getElementById("app").hidden = true;
   }
@@ -116,16 +157,17 @@
     try { await stats(); } catch (e) { return; }
     document.getElementById("login").hidden = true;
     document.getElementById("app").hidden = false;
+    document.getElementById("who-pill").textContent = reviewer ? "Relecture · " + reviewer : "Relecture";
     load();
   }
 
   async function stats() {
     const s = await api("/review/stats");
-    const p = s.pair || {}, w = s.word || {};
+    const p = s.pair || {}, w = s.word || {}, a = s.qa || {};
     document.getElementById("stats").innerHTML = [
       ["Phrases à relire", p.pending || 0], ["dont douteuses", p.doubtful || 0],
       ["Phrases validées", (p.ok || 0) + (p.fixed || 0)], ["Mots validés", (w.ok || 0) + (w.fixed || 0)],
-      ["Rejetées", (p.rejected || 0) + (w.rejected || 0)],
+      ["Questions à relire", a.pending || 0], ["Questions relues", (a.ok || 0) + (a.fixed || 0)],
     ].map(([l, v]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
   }
 
@@ -133,6 +175,10 @@
     kind = k;
     document.getElementById("t-pair").classList.toggle("on", k === "pair");
     document.getElementById("t-word").classList.toggle("on", k === "word");
+    document.getElementById("t-qa").classList.toggle("on", k === "qa");
+    document.getElementById("hint").textContent = k === "qa"
+      ? "Questions posées par les élèves (anonymes) et réponse du prof. Corrigez la réponse si elle est fausse ou maladroite : elle servira d'exemple à l'entraînement."
+      : HINT;
     load();
   }
 
@@ -143,9 +189,10 @@
   async function load() {
     const status = document.getElementById("status").value;
     const q = encodeURIComponent(document.getElementById("q").value);
-    const items = await api(`/review/items?kind=${kind}&status=${status}&q=${q}&limit=30`);
     const list = document.getElementById("list");
-    list.innerHTML = items.length ? "" : `<div class="card hint">Rien ici. Tanemmirt !</div>`;
+    if (kind === "qa") return loadQa(status, q, list);
+    const items = await api(`/review/items?kind=${kind}&status=${status}&q=${q}&limit=30`);
+    list.innerHTML = items.length ? "" : `<div class="card hint">Rien à relire ici. Tanemmirt !</div>`;
     for (const it of items) {
       const el = document.createElement("div");
       el.className = "card";
@@ -173,6 +220,43 @@
     }
   }
 
+  async function loadQa(status, q, list) {
+    const items = await api(`/review/qa?status=${status}&q=${q}&limit=30`);
+    list.innerHTML = items.length ? "" : `<div class="card hint">Aucune question ici pour l'instant.</div>`;
+    for (const it of items) {
+      const el = document.createElement("div");
+      el.className = "card";
+      el.tabIndex = 0;
+      el.innerHTML = `
+        <div class="row" style="justify-content:space-between">
+          <span class="src">${new Date(it.at).toLocaleString("fr-FR")}</span>
+          <span class="tag" style="background:var(--fill);color:var(--text2)">${esc(it.model || "")}</span>
+        </div>
+        <label>Question de l'élève</label>
+        <div class="question">${esc(it.question)}</div>
+        <label for="a-${it.id}">Réponse du prof</label>
+        <textarea id="a-${it.id}" rows="5">${esc(it.answer)}</textarea>
+        <div class="row" style="margin-top:12px">
+          <button class="ok">Juste</button>
+          <button class="fix">Enregistrer la correction</button>
+          <button class="rej">Rejeter</button>
+        </div>`;
+      const [okB, fixB, rejB] = el.querySelectorAll("button");
+      const send = async status => {
+        const answer = document.getElementById("a-" + it.id).value.trim();
+        await api(`/review/qa/${it.id}`, { method: "POST", body: JSON.stringify({ status, answer, reviewer }) });
+        el.classList.add("done");
+        el.querySelectorAll("button, textarea").forEach(x => x.disabled = true);
+        stats();
+      };
+      okB.onclick = () => send("ok");
+      fixB.onclick = () => send("fixed");
+      rejB.onclick = () => send("rejected");
+      el.addEventListener("focusin", () => active = { it, el, send });
+      list.appendChild(el);
+    }
+  }
+
   async function decide(it, el, status) {
     const kab = document.getElementById("k-" + it.id).value.trim();
     const fr = document.getElementById("f-" + it.id).value.trim();
@@ -186,8 +270,9 @@
 
   document.addEventListener("keydown", e => {
     if (!active || e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
-    if (e.key === "v" || e.key === "V") decide(active.it, active.el, "ok");
-    if (e.key === "r" || e.key === "R") decide(active.it, active.el, "rejected");
+    const go = st => active.send ? active.send(st) : decide(active.it, active.el, st);
+    if (e.key === "v" || e.key === "V") go("ok");
+    if (e.key === "r" || e.key === "R") go("rejected");
   });
 
   start();

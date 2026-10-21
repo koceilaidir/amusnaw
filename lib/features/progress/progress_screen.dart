@@ -78,8 +78,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
                               Text('Le début · $pct %', style: TextStyle(fontSize: 15, color: p.text2)),
                               const SizedBox(height: 8),
                               Wrap(spacing: 16, children: [
-                                _Stat(s.learnedTotal, s.learnedTotal > 1 ? 'mots appris' : 'mot appris'),
-                                _Stat((prog?['words_seen'] as num?)?.toInt() ?? 0, 'vus'),
+                                _Stat((prog?['words_seen'] as num?)?.toInt() ?? 0, 'mots vus'),
+                                _Stat(s.learnedTotal, s.learnedTotal > 1 ? 'réemployés' : 'réemployé'),
                               ]),
                             ],
                           ),
@@ -94,7 +94,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     if (units.isEmpty)
                       AppCard(
                         child: snap.connectionState == ConnectionState.waiting
-                            ? const Center(child: CupertinoActivityIndicator())
+                            ? const Center(child: Spinner())
                             : Text('Ton parcours s’affichera ici dès que tu seras en ligne.',
                                 style: TextStyle(fontSize: 15, color: p.text2)),
                       )

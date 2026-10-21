@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../content/sample_content.dart';
 import '../theme/app_theme.dart';
 import '../theme/mark.dart';
+import 'common.dart' show isWide;
 
 /// Petite légende en capitales (EXERCICE, NOUVEAU MOT…).
 class _Label extends StatelessWidget {
@@ -117,8 +118,42 @@ class CapsuleCard extends StatelessWidget {
   }
 }
 
-/// Feuille iOS avec un contenu défilant.
+/// Fiche (mot du jour, capsule) : fenêtre centrée sur ordinateur, feuille du bas sur téléphone.
 Future<void> showAppSheet(BuildContext context, {required List<Widget> Function(AppPalette p) children}) {
+  if (isWide(context)) {
+    return showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      builder: (ctx) {
+        final p = AppPalette.of(ctx);
+        return Dialog(
+          backgroundColor: p.panel,
+          surfaceTintColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(32),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 560, maxHeight: MediaQuery.sizeOf(ctx).height * .85),
+            child: Stack(children: [
+              ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(32, 36, 32, 36),
+                children: children(p),
+              ),
+              Positioned(
+                top: 12,
+                right: 12,
+                child: IconButton(
+                  tooltip: 'Fermer',
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: Icon(Icons.close_rounded, color: p.text2),
+                ),
+              ),
+            ]),
+          ),
+        );
+      },
+    );
+  }
   return showModalBottomSheet(
     context: context,
     useRootNavigator: true,

@@ -10,6 +10,7 @@ import '../../core/chat/conversation_store.dart';
 import '../../core/learning/learner_store.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/mark.dart';
+import '../../widgets/common.dart';
 
 /// « Garde ta progression » : proposé au visiteur sans compte après quelques
 /// messages, et depuis le menu. Sa progression et ses discussions passent
@@ -109,7 +110,7 @@ class _AccountDialogState extends State<_AccountDialog> {
             ),
             const SizedBox(height: 22),
             if (_busy)
-              const Padding(padding: EdgeInsets.all(14), child: CupertinoActivityIndicator())
+              const Padding(padding: EdgeInsets.all(14), child: Center(child: Spinner()))
             else
               GoogleButton(onPressed: _mobileGoogle),
             if (_error != null) ...[

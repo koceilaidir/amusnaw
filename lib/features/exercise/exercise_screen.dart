@@ -76,7 +76,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Text('Cette leçon arrive bientôt.', style: TextStyle(fontSize: 17, color: p.text2)),
               const SizedBox(height: 16),
-              CupertinoButton(child: const Text('Fermer'), onPressed: () => Navigator.of(context).pop(false)),
+              TextButton(child: const Text('Fermer'), onPressed: () => Navigator.of(context).pop(false)),
             ]),
           ),
         ),
@@ -86,7 +86,9 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
+        child: ReadingWidth(
+          maxWidth: 680,
+          child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -131,6 +133,7 @@ class _ExerciseScreenState extends State<ExerciseScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

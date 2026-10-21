@@ -1,7 +1,5 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_service.dart';
@@ -12,209 +10,160 @@ import '../../core/locale/locale_controller.dart';
 import '../../core/notifications/reminder_service.dart';
 import '../../core/settings/app_settings.dart';
 import '../../theme/app_theme.dart';
-import '../../theme/mark.dart';
 import '../../widgets/common.dart';
+import '../../widgets/dialogs.dart';
 import '../onboarding/account_dialog.dart';
+import 'privacy_screen.dart';
 
-/// Ouvre les réglages : page entière sur téléphone, fenêtre centrée au-dessus
-/// de la conversation sur ordinateur (comme sur Claude).
-Future<void> openSettings(BuildContext context) {
-  if (!isWide(context)) {
-    return Navigator.of(context, rootNavigator: true)
-        .push(CupertinoPageRoute(builder: (_) => const SettingsScreen()));
-  }
-  final size = MediaQuery.sizeOf(context);
-  return showDialog<void>(
-    context: context,
-    useRootNavigator: true,
-    barrierColor: const Color(0x73000000),
-    builder: (ctx) => Dialog(
-      backgroundColor: AppPalette.of(ctx).bg,
-      insetPadding: const EdgeInsets.all(32),
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      child: SizedBox(
-        width: 680,
-        height: (size.height * .86).clamp(420.0, 820.0),
-        child: const SettingsScreen(inDialog: true),
-      ),
-    ),
-  );
-}
+/// Ouvre les réglages dans une page entière (sur ordinateur comme sur téléphone).
+Future<void> openSettings(BuildContext context) => Navigator.of(context, rootNavigator: true).push(
+      appRoute((ctx) => Material(
+            color: AppPalette.of(ctx).bg,
+            child: const ReadingWidth(maxWidth: 720, child: SettingsScreen()),
+          )),
+    );
 
-/// Réglages : langue du prof, apparence, rappel quotidien, confidentialité,
-/// déconnexion et suppression du compte.
+/// Réglages : langue du prof, apparence, rappel quotidien, compte, confidentialité.
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, this.inDialog = false});
-
-  /// Affiché dans une fenêtre centrée (ordinateur) plutôt qu'en page entière.
-  final bool inDialog;
+  const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
-    return Material(
-      color: p.bg,
-      child: CupertinoPageScaffold(
-        backgroundColor: p.bg,
-        child: AnimatedBuilder(
-          animation: Listenable.merge([appSettings, localeController, learnerStore]),
-          builder: (context, _) {
-            final s = appSettings.value;
-            final name = learnerStore.value.name;
-            return CustomScrollView(
-              slivers: [
-                largeTitleBar(context, 'Réglages', closeButton: inDialog),
-                SliverToBoxAdapter(
-                  child: Column(children: [
-                    const SizedBox(height: 8),
-                    AmusnawMark(size: 52, color: p.text),
-                    const SizedBox(height: 8),
-                    if (name.isNotEmpty)
-                      Text(name, style: AppTheme.serif(size: 22, color: p.text)),
-                    CupertinoListSection.insetGrouped(
-                      backgroundColor: p.bg,
-                      header: const Text('LE PROF'),
-                      children: [
-                        CupertinoListTile(
-                          leading: const TintIcon(CupertinoIcons.globe),
-                          title: Text('Explique en', style: TextStyle(color: p.text)),
-                          additionalInfo: Text(localeController.value.label),
-                          trailing: const CupertinoListTileChevron(),
-                          onTap: () => _pickLanguage(context),
-                        ),
-                      ],
+    return AnimatedBuilder(
+      animation: Listenable.merge([appSettings, localeController, learnerStore]),
+      builder: (context, _) {
+        final s = appSettings.value;
+        final name = learnerStore.value.name;
+        return CustomScrollView(slivers: [
+          largeTitleBar(context, 'Réglages'),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 40),
+            sliver: SliverList.list(children: [
+              if (name.isNotEmpty) ...[
+                AppCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: p.accentSoft, shape: BoxShape.circle),
+                      child: Text(name.substring(0, 1).toUpperCase(),
+                          style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600, color: p.accentText)),
                     ),
-                    CupertinoListSection.insetGrouped(
-                      backgroundColor: p.bg,
-                      header: const Text('APPARENCE'),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: CupertinoSlidingSegmentedControl<ThemeMode>(
-                              groupValue: s.themeMode,
-                              onValueChanged: (m) {
-                                if (m != null) appSettings.setThemeMode(m);
-                              },
-                              children: const {
-                                ThemeMode.system: Text('Automatique'),
-                                ThemeMode.light: Text('Clair'),
-                                ThemeMode.dark: Text('Sombre'),
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (!kIsWeb) // pas de notification programmée dans un navigateur
-                    CupertinoListSection.insetGrouped(
-                      backgroundColor: p.bg,
-                      header: const Text('RAPPEL QUOTIDIEN'),
-                      footer: const Text('Facultatif. Un petit signe par jour — tu peux l’ignorer quand tu veux.'),
-                      children: [
-                        CupertinoListTile(
-                          leading: const TintIcon(CupertinoIcons.bell_fill),
-                          title: Text('Me le rappeler', style: TextStyle(color: p.text)),
-                          trailing: CupertinoSwitch(
-                            value: s.reminderOn,
-                            activeTrackColor: p.ink,
-                            onChanged: (on) => _toggleReminder(context, on),
-                          ),
-                        ),
-                        if (s.reminderOn)
-                          CupertinoListTile(
-                            leading: const TintIcon(CupertinoIcons.clock_fill),
-                            title: Text('Heure', style: TextStyle(color: p.text)),
-                            additionalInfo: Text(s.reminderTime.format(context)),
-                            trailing: const CupertinoListTileChevron(),
-                            onTap: () => _pickTime(context),
-                          ),
-                      ],
-                    ),
-                    FutureBuilder<bool>(
-                      // Sans compte : proposer d'en créer un pour garder sa progression
-                      future: authService.isGuest(),
-                      builder: (ctx, g) => g.data == true && authService.googleEnabled
-                          ? CupertinoListSection.insetGrouped(
-                              backgroundColor: p.bg,
-                              header: const Text('SANS COMPTE'),
-                              footer: const Text('Ta progression et tes discussions sont gardées sur ton compte.'),
-                              children: [
-                                CupertinoListTile(
-                                  leading: const TintIcon(CupertinoIcons.person_crop_circle_badge_plus),
-                                  title: Text('Créer un compte', style: TextStyle(color: p.text)),
-                                  trailing: const CupertinoListTileChevron(),
-                                  onTap: () => showAccountDialog(ctx),
-                                ),
-                              ],
-                            )
-                          : const SizedBox.shrink(),
-                    ),
-                    CupertinoListSection.insetGrouped(
-                      backgroundColor: p.bg,
-                      header: const Text('COMPTE'),
-                      children: [
-                        CupertinoListTile(
-                          leading: const TintIcon(CupertinoIcons.lock_shield_fill),
-                          title: Text('Confidentialité', style: TextStyle(color: p.text)),
-                          trailing: const CupertinoListTileChevron(),
-                          onTap: () => launchUrl(Uri.parse('${AppConfig.apiBaseUrl}/privacy'),
-                              mode: LaunchMode.inAppBrowserView),
-                        ),
-                        CupertinoListTile(
-                          leading: const TintIcon(CupertinoIcons.square_arrow_right),
-                          title: Text('Se déconnecter', style: TextStyle(color: p.text)),
-                          onTap: () => _signOut(context),
-                        ),
-                        CupertinoListTile(
-                          leading: const TintIcon(CupertinoIcons.trash_fill),
-                          title: const Text('Supprimer mon compte',
-                              style: TextStyle(color: CupertinoColors.destructiveRed)),
-                          onTap: () => _deleteAccount(context),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
-                      child: Text('Amusnaw',
-                          style: TextStyle(fontSize: 13, color: p.text2)),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: p.text)),
+                        const SizedBox(height: 2),
+                        Text('Niveau A1', style: TextStyle(fontSize: 14, color: p.text2)),
+                      ]),
                     ),
                   ]),
                 ),
+                const SizedBox(height: 22),
               ],
-            );
-          },
-        ),
-      ),
+              _Section(title: 'Le prof', children: [
+                _Row(
+                  icon: Icons.translate_rounded,
+                  title: 'Explique en',
+                  value: localeController.value.label,
+                  onTap: () => _pickLanguage(context),
+                ),
+              ]),
+              _Section(title: 'Apparence', children: [
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: _Segments<ThemeMode>(
+                    value: s.themeMode,
+                    onChanged: appSettings.setThemeMode,
+                    options: const {
+                      ThemeMode.system: 'Automatique',
+                      ThemeMode.light: 'Clair',
+                      ThemeMode.dark: 'Sombre',
+                    },
+                  ),
+                ),
+              ]),
+              if (!kIsWeb) // pas de notification programmée dans un navigateur
+                _Section(
+                  title: 'Rappel quotidien',
+                  footer: 'Facultatif. Un petit signe par jour, tu peux l’ignorer quand tu veux.',
+                  children: [
+                    _Row(
+                      icon: Icons.notifications_none_rounded,
+                      title: 'Me le rappeler',
+                      trailing: Switch(
+                        value: s.reminderOn,
+                        activeTrackColor: p.accent,
+                        onChanged: (on) => _toggleReminder(context, on),
+                      ),
+                    ),
+                    if (s.reminderOn)
+                      _Row(
+                        icon: Icons.schedule_rounded,
+                        title: 'Heure',
+                        value: s.reminderTime.format(context),
+                        onTap: () => _pickTime(context),
+                      ),
+                  ],
+                ),
+              FutureBuilder<bool>(
+                // Sans compte : proposer d'en créer un pour garder sa progression
+                future: authService.isGuest(),
+                builder: (ctx, g) => g.data == true && authService.googleEnabled
+                    ? _Section(
+                        title: 'Sans compte',
+                        footer: 'Ta progression et tes discussions sont gardées sur ton compte.',
+                        children: [
+                          _Row(
+                            icon: Icons.person_add_alt_rounded,
+                            title: 'Créer un compte',
+                            onTap: () => showAccountDialog(ctx),
+                          ),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              _Section(title: 'Compte', children: [
+                _Row(
+                  icon: Icons.shield_outlined,
+                  title: 'Règles de confidentialité',
+                  onTap: () => Navigator.of(context).push(appRoute((ctx) => Material(
+                        color: AppPalette.of(ctx).bg,
+                        child: const ReadingWidth(maxWidth: 720, child: PrivacyScreen()),
+                      ))),
+                ),
+                _Row(icon: Icons.logout_rounded, title: 'Se déconnecter', onTap: () => _signOut(context)),
+                _Row(
+                  icon: Icons.delete_outline_rounded,
+                  title: 'Supprimer mon compte',
+                  danger: true,
+                  onTap: () => _deleteAccount(context),
+                ),
+              ]),
+              Center(
+                child: Text('Amusnaw · ${AppConfig.aiName}', style: TextStyle(fontSize: 13, color: p.text2)),
+              ),
+            ]),
+          ),
+        ]);
+      },
     );
   }
 
-  void _pickLanguage(BuildContext context) {
-    showCupertinoModalPopup<void>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('Ton prof explique en'),
-        actions: [
-          for (final l in supportedTutorLanguages)
-            CupertinoActionSheetAction(
-              isDefaultAction: l.code == localeController.value.code,
-              onPressed: () {
-                localeController.choose(l, syncServer: true);
-                final s = appSettings.value;
-                if (s.reminderOn) reminderService.schedule(s.reminderTime, l.code);
-                Navigator.pop(ctx);
-              },
-              child: Text(l.label),
-            ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Annuler'),
-        ),
-      ),
+  Future<void> _pickLanguage(BuildContext context) async {
+    final l = await showChoice<TutorLanguage>(
+      context,
+      'Ton prof explique en',
+      {for (final l in supportedTutorLanguages) l: l.label},
+      selected: localeController.value,
     );
+    if (l == null) return;
+    localeController.choose(l, syncServer: true);
+    final s = appSettings.value;
+    if (s.reminderOn) reminderService.schedule(s.reminderTime, l.code);
   }
 
   Future<void> _toggleReminder(BuildContext context, bool on) async {
@@ -226,7 +175,7 @@ class SettingsScreen extends StatelessWidget {
     final granted = await reminderService.requestPermission();
     if (!granted) {
       if (context.mounted) {
-        _alert(context, 'Notifications désactivées',
+        await showInfo(context, 'Notifications désactivées',
             'Autorise les notifications d’Amusnaw dans les réglages du téléphone pour recevoir le rappel.');
       }
       return;
@@ -236,51 +185,25 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _pickTime(BuildContext context) async {
-    var picked = appSettings.value.reminderTime;
-    final now = DateTime.now();
-    final ok = await showCupertinoModalPopup<bool>(
-      context: context,
-      builder: (ctx) => Container(
-        height: 300,
-        color: AppPalette.of(ctx).surface,
-        child: SafeArea(
-          top: false,
-          child: Column(children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: CupertinoButton(
-                child: const Text('OK'),
-                onPressed: () => Navigator.pop(ctx, true),
-              ),
-            ),
-            Expanded(
-              child: CupertinoDatePicker(
-                mode: CupertinoDatePickerMode.time,
-                initialDateTime: DateTime(now.year, now.month, now.day, picked.hour, picked.minute),
-                onDateTimeChanged: (d) => picked = TimeOfDay(hour: d.hour, minute: d.minute),
-              ),
-            ),
-          ]),
-        ),
-      ),
-    );
-    if (ok != true) return;
+    final picked = await showTimePicker(context: context, initialTime: appSettings.value.reminderTime);
+    if (picked == null) return;
     appSettings.setReminder(on: true, time: picked);
     await reminderService.schedule(picked, localeController.value.code);
   }
 
   Future<void> _signOut(BuildContext context) async {
-    final yes = await _confirm(context, 'Se déconnecter ?',
+    final yes = await showConfirm(context, 'Se déconnecter ?',
         'Ta progression reste enregistrée sur le serveur. Reconnecte-toi pour continuer.', 'Se déconnecter');
     if (yes && context.mounted) await endSession(context);
   }
 
   Future<void> _deleteAccount(BuildContext context) async {
-    final yes = await _confirm(
+    final yes = await showConfirm(
       context,
       'Supprimer ton compte ?',
       'Tes conversations, tes mots appris et ta progression seront effacés définitivement.',
       'Supprimer',
+      danger: true,
     );
     if (!yes || !context.mounted) return;
     try {
@@ -288,40 +211,130 @@ class SettingsScreen extends StatelessWidget {
       if (context.mounted) await endSession(context);
     } catch (_) {
       if (context.mounted) {
-        _alert(context, 'Suppression impossible', 'Le serveur est injoignable. Réessaie plus tard.');
+        await showInfo(context, 'Suppression impossible', 'Le serveur est injoignable. Réessaie plus tard.');
       }
     }
   }
+}
 
-  Future<bool> _confirm(BuildContext context, String title, String body, String action) async {
-    final r = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(action),
+/// Un groupe de réglages : petit titre, carte, note facultative.
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.children, this.footer});
+  final String title;
+  final String? footer;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      if (i > 0) rows.add(Divider(height: 1, thickness: .5, indent: 56, color: p.separator));
+      rows.add(children[i]);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: Caption(title)),
+        AppCard(padding: const EdgeInsets.symmetric(vertical: 4), child: Column(children: rows)),
+        if (footer != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 8, 6, 0),
+            child: Text(footer!, style: TextStyle(fontSize: 13, height: 1.4, color: p.text2)),
           ),
-        ],
+      ]),
+    );
+  }
+}
+
+/// Une ligne de réglage : icône, titre, valeur, flèche (ou interrupteur).
+class _Row extends StatelessWidget {
+  const _Row({required this.icon, required this.title, this.value, this.trailing, this.onTap, this.danger = false});
+  final IconData icon;
+  final String title;
+  final String? value;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    final color = danger ? const Color(0xFFB3261E) : p.text;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      hoverColor: p.fill.withValues(alpha: .6),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 54),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          child: Row(children: [
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: danger ? const Color(0x1AB3261E) : p.accentSoft,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, size: 18, color: danger ? color : p.accentText),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(title, style: TextStyle(fontSize: 16, color: color))),
+            if (value != null) Text(value!, style: TextStyle(fontSize: 15, color: p.text2)),
+            if (trailing != null)
+              trailing!
+            else if (onTap != null && !danger) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.chevron_right_rounded, size: 22, color: p.text2),
+            ],
+          ]),
+        ),
       ),
     );
-    return r ?? false;
   }
+}
 
-  void _alert(BuildContext context, String title, String body) {
-    showCupertinoDialog<void>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
-        ],
-      ),
+/// Choix entre quelques options, sur une seule ligne.
+class _Segments<T> extends StatelessWidget {
+  const _Segments({required this.value, required this.onChanged, required this.options});
+  final T value;
+  final ValueChanged<T> onChanged;
+  final Map<T, String> options;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = AppPalette.of(context);
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: p.fill, borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        for (final e in options.entries)
+          Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(e.key),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: e.key == value ? p.surface : Colors.transparent,
+                    borderRadius: BorderRadius.circular(11),
+                    boxShadow: e.key == value ? p.shadow : null,
+                  ),
+                  child: Text(e.value,
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: e.key == value ? FontWeight.w600 : FontWeight.w400,
+                          color: e.key == value ? p.text : p.text2)),
+                ),
+              ),
+            ),
+          ),
+      ]),
     );
   }
 }

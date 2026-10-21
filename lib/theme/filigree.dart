@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'app_theme.dart';
 
 /// Aquarelles kabyles (vallée, olivier, plaine, brume) posées en filigrane.
-/// Peintes sur papier clair : en mode sombre on les fond beaucoup plus.
+/// Peintes sur papier clair : affichées en mode clair seulement.
 enum Fond {
   vallee('assets/fonds/vallee.webp'),
   olivier('assets/fonds/paysage-olivier.webp'),
@@ -32,14 +32,19 @@ class Aquarelle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = AppPalette.of(context).isDark;
+    // Peintes sur papier clair : en mode sombre elles ressemblent à du brouillard, on ne les montre pas.
+    if (AppPalette.of(context).isDark) {
+      return height == null
+          ? const Positioned.fill(child: SizedBox.shrink())
+          : const Positioned(left: 0, right: 0, bottom: 0, height: 0, child: SizedBox.shrink());
+    }
     final img = Image.asset(
       fond.asset,
       fit: fit,
       alignment: alignment,
       width: double.infinity,
       height: height ?? double.infinity,
-      opacity: AlwaysStoppedAnimation(dark ? opacity * .22 : opacity),
+      opacity: AlwaysStoppedAnimation(opacity),
       filterQuality: FilterQuality.medium,
       gaplessPlayback: true,
       excludeFromSemantics: true,

@@ -260,6 +260,21 @@ def _keywords(kab_text: str, n: int = 4) -> list[tuple[str, str]]:
     return out
 
 
+# Erreurs connues du traducteur automatique, corrigées par un kabylophone :
+# (mot français dans la phrase source, mauvaise traduction, bonne traduction).
+TERM_FIXES = [
+    (r"grand[- ]m[èe]re", r"jeddi", "jidda"),  # jeddi = grand-père ; grand-mère = jidda
+]
+
+
+def fix_terms(source_fr: str, out_kab: str) -> str:
+    for fr_rx, wrong, right in TERM_FIXES:
+        if re.search(fr_rx, source_fr, re.I):
+            out_kab = re.sub(rf"\b{wrong}\b", lambda m: right.capitalize() if m.group(0)[0].isupper() else right,
+                             out_kab, flags=re.I)
+    return out_kab
+
+
 async def reply(text: str, language: str = "fr") -> str | None:
     """Réponse complète du prof pour une demande de traduction, ou None si on ne peut pas traduire ici."""
     text = text.strip()
@@ -277,6 +292,8 @@ async def reply(text: str, language: str = "fr") -> str | None:
     if res is None:
         return None
     out, origin = res
+    if tgt == "kab" and "machine" in origin:
+        out = fix_terms(text, out)
     lines = [f"**{out}**"]
     kab_side = out if tgt == "kab" else text
     kw = _keywords(kab_side)

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import '../theme/mark.dart';
+import 'content_cards.dart' show RoundIconButton;
 
 /// Carte arrondie iOS (fond « secondary grouped »).
 class AppCard extends StatelessWidget {
@@ -96,24 +97,35 @@ class PrimaryButton extends StatelessWidget {
       );
 }
 
-/// Barre de navigation iOS aux couleurs de l'app.
-CupertinoSliverNavigationBar largeTitleBar(BuildContext context, String title,
-    {Widget? trailing, bool closeButton = false}) {
+/// En-tête d'une page : bouton retour (ou croix), puis le grand titre.
+Widget largeTitleBar(BuildContext context, String title, {Widget? trailing, bool closeButton = false}) {
   final p = AppPalette.of(context);
-  return CupertinoSliverNavigationBar(
-    largeTitle: Text(title, style: TextStyle(color: p.text)),
-    backgroundColor: p.bg.withValues(alpha: .92),
-    border: null,
-    automaticallyImplyLeading: !closeButton,
-    // dans une fenêtre (ordinateur) : une croix pour fermer, pas de « retour »
-    trailing: closeButton
-        ? CupertinoButton(
-            padding: EdgeInsets.zero,
-            minSize: 36,
-            onPressed: () => Navigator.of(context).pop(),
-            child: Icon(CupertinoIcons.xmark, size: 20, color: p.text2),
-          )
-        : trailing,
+  final canPop = Navigator.of(context).canPop();
+  return SliverToBoxAdapter(
+    child: SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            if (canPop)
+              RoundIconButton(
+                label: closeButton ? 'Fermer' : 'Retour',
+                icon: Icon(closeButton ? Icons.close_rounded : Icons.arrow_back_rounded, size: 20, color: p.text),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+            const Spacer(),
+            if (trailing != null) trailing,
+          ]),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(title,
+                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w600, letterSpacing: -1, height: 1.1, color: p.text)),
+          ),
+        ]),
+      ),
+    ),
   );
 }
 
@@ -141,5 +153,19 @@ class ReadingWidth extends StatelessWidget {
             child: child,
           ),
         ),
+      );
+}
+
+/// Petit indicateur de chargement (rond, aux couleurs de l'app).
+class Spinner extends StatelessWidget {
+  const Spinner({super.key, this.size = 20, this.color});
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: size,
+        height: size,
+        child: CircularProgressIndicator(strokeWidth: 2.2, color: color ?? AppPalette.of(context).text2),
       );
 }

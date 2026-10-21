@@ -1,4 +1,5 @@
 import json
+import random
 import re
 import secrets
 from contextlib import asynccontextmanager
@@ -8,7 +9,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import tutor
@@ -16,10 +17,10 @@ from .auth import (current_user, issue_token, link_guest, upsert_user, user_from
                    verify_google)
 from .config import get_settings
 from .limits import chat_limit, signup_limit
-from .db import (ChatMessage, LearnedWord, LearnerProfile, Review, SavedConversation, SessionLocal, User,
+from .db import (ChatMessage, LearnedWord, LearnerProfile, QaReview, Review, SavedConversation, SessionLocal, User,
                  get_db, init_db, now)
 from .knowledge import kb
-from . import content, email_login, guide, learning, router, translate
+from . import content, email_login, guide, learning, router, spell, translate
 
 
 _BACKGROUND: set = set()  # tâches de fond gardées en vie
@@ -253,12 +254,21 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session, ready: str | None = N
     if _CORRECT.search(body.message):
         body.intent = "correct"
     talk = body.intent in TALK_MODES
-    direct = None if body.intent == "correct" else router.direct_reply(body.message, user.interface_language)
+    if _ANOTHER.match(body.message):
+        return profile, newly_learned, None, None, ("Vas-y, je t'écoute ! Un mot, une phrase, la grammaire, "
+                                                    "la culture kabyle : pose ta question.")
+    if body.intent == "correct":  # règles sûres d'abord (ur … ara, ɣ/ɛ/ḍ…), sinon le modèle de correction
+        direct = spell.reply(body.message)
+    else:
+        direct = router.direct_reply(body.message, user.interface_language)
     if direct:
         return profile, newly_learned, None, None, direct
     # 3. Leçon guidée : « Apprendre », « continue », « autre chose »… le programme avance tout seul,
     #    et la réponse de l'élève à l'exercice est vérifiée (bravo, ou correction douce).
     if user.interface_language == "fr" and not talk:
+        if body.intent != "learn" and (again := guide.repeat(user.id, body.message)):
+            _SUGGEST[user.id] = list(guide.SUGGEST_STEP)
+            return profile, newly_learned, None, None, again
         if body.intent != "learn" and (ans := guide.check_answer(user.id, body.message)):
             _SUGGEST[user.id] = ["Continuer", "Parlons d'autre chose"]
             return profile, newly_learned, None, None, ans
@@ -294,6 +304,10 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session, ready: str | None = N
         words_to_reuse=learning.words_to_reuse(db, user.id, tz),
     )
     system += INTENT_HINTS.get(body.intent or "", "")
+    if not talk and body.intent != "learn":
+        system += ("\n\nSi l'élève pose une question (sur un mot, une phrase, la grammaire, la culture), "
+                   "réponds-y d'abord, simplement et sans inventer de kabyle. Ne relance pas toi-même la leçon : "
+                   "l'application lui proposera de la reprendre.")
     refs = "\n".join(x for x in (kb.references_for(context), router.verb_hints(body.message)) if x)
     if refs:  # jointes au dernier message (voir tutor._messages)
         system += tutor.REFS_MARK + refs
@@ -302,9 +316,10 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session, ready: str | None = N
 
 def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
                  off_topic: bool, newly_learned: list[str], intent: str | None = None,
-                 system: str = "") -> dict:
-    """Ce qui suit la réponse : blocs, mots découverts, historique, total."""
-    model = None if off_topic else tutor.model_for(intent)
+                 system: str = "", by_model: bool = True) -> dict:
+    """Ce qui suit la réponse : blocs, mots découverts, historique, total.
+    `by_model` : réponse écrite par le modèle (sinon par le serveur : leçon, dictionnaire…)."""
+    model = None if off_topic else (tutor.model_for(intent) if by_model else "serveur")
     reply, markers = content.strip_markers(reply)
     if intent == "learn" and not any(k in ("EXERCICE", "EXERCISE") for k, _ in markers):
         markers.append(("EXERCICE", ""))  # « Apprendre » donne toujours un exercice
@@ -318,6 +333,14 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
         ChatMessage(user_id=user.id, role="user", content=message, off_topic=off_topic),
         ChatMessage(user_id=user.id, role="assistant", content=reply, off_topic=off_topic, model=model),
     ])
+    if by_model and not off_topic and reply.strip():
+        # question libre + réponse du modèle, anonymes, à relire sur /review (entraînement du prof)
+        db.add(QaReview(question=message[:2000], answer=reply[:6000], model=model or ""))
+    if intent not in TALK_MODES and intent != "learn" and user.id not in _SUGGEST \
+            and not _ANOTHER.match(message):
+        # réponse à une question (hors étape de leçon) : on propose d'y revenir (« oui » relance la leçon)
+        _SUGGEST[user.id] = list(QUESTION_SUGGEST)
+        guide.offer(user.id)
     profile.last_session_at = now()
     db.merge(profile)
     db.commit()
@@ -338,6 +361,8 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
 
 # Réponses rapides à proposer sous la prochaine réponse (posées par _prepare_turn)
 _SUGGEST: dict[str, list[str]] = {}
+QUESTION_SUGGEST = ("Reprendre la leçon", "J'ai une autre question")
+_ANOTHER = re.compile(r"^\s*j'?ai une (?:autre )?question\s*[.!]?\s*$", re.I)
 
 
 def _trim_unfinished(text: str) -> str:
@@ -359,7 +384,8 @@ async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = D
     profile, newly, system, history, direct = _prepare_turn(body, user, db, ready)
     db.commit()  # rien de verrouillé pendant que le modèle écrit (sinon blocage si l'élève renvoie)
     if direct:
-        return _finish_turn(db, user, profile, body.message, direct, False, newly, body.intent, direct)
+        return _finish_turn(db, user, profile, body.message, direct, False, newly, body.intent, direct,
+                            by_model=False)
     if system is None:
         reply = tutor.off_topic_reply(user.interface_language)
         return _finish_turn(db, user, profile, body.message, reply, True, newly)
@@ -390,7 +416,7 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
             shown, _ = content.strip_markers(direct)
             yield event({"type": "delta", "text": shown})
             yield event({"type": "done", **_finish_turn(db, user, profile, body.message, direct, False, newly,
-                                                         body.intent, direct)})
+                                                         body.intent, direct, by_model=False)})
             return
         if system is None:
             reply = tutor.off_topic_reply(user.interface_language)
@@ -540,6 +566,44 @@ def words_seen(body: SeenIn, user: User = Depends(current_user), db: Session = D
 
 
 
+@app.get("/learning/review")
+def review_words(n: int = Query(8, ge=3, le=20), user: User = Depends(current_user),
+                 db: Session = Depends(get_db)):
+    """« Réviser mes mots » : les mots déjà croisés par l'élève, les moins sûrs d'abord
+    (pas encore réemployés, découverts depuis longtemps), en questions à choix."""
+    from .knowledge import fold  # noqa: PLC0415
+    rows = db.scalars(select(LearnedWord).where(LearnedWord.user_id == user.id)).all()
+    if not rows:
+        return {"exercises": [], "words": 0}
+    prog = {fold(w["kab"]): w for u in content.curriculum_lessons() for w in u["words"]}
+    known = []  # (mot kabyle, sens)
+    for r in sorted(rows, key=lambda r: (r.mastered_at is not None, r.introduced_at)):
+        w = prog.get(r.word_key)
+        if w:
+            known.append((w["kab"], w["fr"]))
+        elif (it := content._find_word(r.display)) is not None:  # noqa: SLF001
+            fr = content._clean_fr(it.fr)  # noqa: SLF001
+            if fr and len(fr) <= 40:
+                known.append((it.kab, fr))
+    known = list(dict.fromkeys(known))
+    pool = [fr for _, fr in known] + [w["fr"] for w in prog.values()]
+    rng = random.Random(f"{user.id}{now().date()}")
+    chosen = known[: max(n // 2, 1)]
+    rest = known[len(chosen):]
+    chosen += rng.sample(rest, min(n - len(chosen), len(rest)))
+    rng.shuffle(chosen)
+    ex = []
+    for i, (kab, fr) in enumerate(chosen):
+        if i % 3 == 2:  # une question sur trois dans l'autre sens : retrouver le mot kabyle
+            ex.append(content._mcq(f"rv-p-{kab}", "COMMENT DIT-ON…", f"« {fr} »", kab,  # noqa: SLF001
+                                   [k for k, _ in known] + [w["kab"] for w in prog.values()], rng,
+                                   explanation=f"« {fr} » se dit {kab}."))
+        else:
+            ex.append(content._mcq(f"rv-r-{kab}", "QUE VEUT DIRE CE MOT ?", kab, fr, pool, rng,  # noqa: SLF001
+                                   explanation=f"{kab} — {fr}.", tifinagh=content.to_tifinagh(kab)))
+    return {"exercises": ex, "words": len(known)}
+
+
 # ---------- Relecture par le linguiste ----------
 
 def require_reviewer(x_review_token: str = Header(default="")) -> None:
@@ -554,8 +618,13 @@ def review_page():
 
 
 @app.get("/review/stats", dependencies=[Depends(require_reviewer)])
-def review_stats():
+def review_stats(db: Session = Depends(get_db)):
     stats: dict[str, dict[str, int]] = {}
+    qa = {"total": 0, "pending": 0, "ok": 0, "fixed": 0, "rejected": 0}
+    for st, n in db.execute(select(QaReview.status, func.count()).group_by(QaReview.status)):
+        qa[st] = n
+        qa["total"] += n
+    stats["qa"] = qa
     for it in kb.items.values():
         s = stats.setdefault(it.kind, {"total": 0, "pending": 0, "ok": 0, "fixed": 0, "rejected": 0, "doubtful": 0})
         s["total"] += 1
@@ -607,10 +676,45 @@ def review_item(item_id: str, body: ReviewIn, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@app.get("/review/qa", dependencies=[Depends(require_reviewer)])
+def review_qa(status: str = Query("pending", pattern="^(pending|ok|fixed|rejected)$"), q: str = "",
+              limit: int = Query(30, le=200), db: Session = Depends(get_db)):
+    """Questions des élèves et réponses du modèle (anonymes), les plus récentes d'abord."""
+    stmt = select(QaReview).where(QaReview.status == status)
+    if q:
+        stmt = stmt.where(QaReview.question.ilike(f"%{q}%") | QaReview.answer.ilike(f"%{q}%"))
+    rows = db.scalars(stmt.order_by(QaReview.created_at.desc()).limit(limit)).all()
+    return [{"id": r.id, "question": r.question, "answer": r.fixed or r.answer, "model": r.model,
+             "status": r.status, "at": r.created_at.isoformat()} for r in rows]
+
+
+class QaIn(BaseModel):
+    status: str = Field(pattern="^(ok|fixed|rejected|pending)$")
+    answer: str | None = Field(default=None, max_length=6000)
+    reviewer: str = Field(default="", max_length=80)
+
+
+@app.post("/review/qa/{qid}", dependencies=[Depends(require_reviewer)])
+def review_qa_item(qid: str, body: QaIn, db: Session = Depends(get_db)):
+    row = db.get(QaReview, qid)
+    if not row:
+        raise HTTPException(404)
+    row.status = body.status
+    row.fixed = (body.answer or "").strip() if body.status == "fixed" else ""
+    row.reviewer = body.reviewer
+    row.updated_at = now()
+    db.commit()
+    return {"ok": True}
+
+
 @app.get("/review/export.jsonl", dependencies=[Depends(require_reviewer)])
 def review_export():
     """Paires et mots validés (ok + corrigés) : le jeu d'entraînement d'amusnaw-v1."""
     lines = [json.dumps({"kind": it.kind, "kab": it.kab, "fr": it.fr, "source": it.source,
                          "status": it.status}, ensure_ascii=False)
              for it in kb.items.values() if it.status in ("ok", "fixed")]
+    with SessionLocal() as db:  # questions relues : la bonne réponse (corrigée ou validée)
+        for r in db.scalars(select(QaReview).where(QaReview.status.in_(("ok", "fixed")))):
+            lines.append(json.dumps({"kind": "qa", "question": r.question, "answer": r.fixed or r.answer,
+                                     "status": r.status}, ensure_ascii=False))
     return PlainTextResponse("\n".join(lines) + "\n", media_type="application/x-ndjson")

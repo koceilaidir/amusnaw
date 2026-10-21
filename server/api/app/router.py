@@ -37,7 +37,12 @@ _OFF_TOPIC = re.compile(
     r"(?:mon|ce|un)\s+devoir\s+de\s+(?:maths?|math[ée]matiques|physique|chimie)|"
     r"[ée]quation|d[ée]riv[ée]e|int[ée]grale|"
     r"crypto|bitcoin|bourse|investir|placement|imp[ôo]ts?|avocat|proc[èe]s|"
-    r"m[ée]t[ée]o|recette\s+de\s+(?!.*kabyle)|r[ée]sultat\s+du\s+match)\b", re.I)
+    r"m[ée]t[ée]o|recette\s+de\s+(?!.*kabyle)|r[ée]sultat\s+du\s+match|"
+    # culture générale et actualité sans lien avec le kabyle
+    r"qui\s+a\s+gagn[ée]|coupe\s+du\s+monde|ligue\s+des\s+champions|championnat|ballon\s+d['’]or|"
+    r"[ée]lections?|pr[ée]sident(?:e)?\s+(?:de|des|du)\s+(?!.*(?:hca|kabyl|amazigh))|"
+    r"capitale\s+d[eu']|combien\s+(?:fait|font)\s+\d|"
+    r"[ée]cri[st](?:-moi)?\s+(?:un|une|le|la)\s+(?:code|programme|script|cv|lettre\s+de\s+motivation))\b", re.I)
 
 
 def _strip(x: str) -> str:
@@ -224,15 +229,19 @@ def _short_src(src: str) -> str:
 def other_senses(it: Item, n: int = 2) -> str:
     """Autres sens du même mot dans d'autres sources (homonymes, sens courant appris…)."""
     _, kab_idx = _indexes()
-    seen = {fold(_clean_fr(it.fr)).rstrip(" .")}
+
+    def same(x: str) -> str:  # « Le pays » et « Pays » sont le même sens
+        return re.sub(r"^(?:le|la|les|l'|l’|un|une|des)\s*", "", fold(x).rstrip(" .")).strip()
+
+    seen = {same(_clean_fr(it.fr))}
     out = []
     for o in sorted(kab_idx.get(_key(it.kab), []), key=lambda o: _rank(o), reverse=True):
         if o is it or o.kind != "word":
             continue
         fr = _clean_fr(o.fr).rstrip(" .")
-        if not fr or fold(fr) in seen or len(fr) > 60:
+        if not fr or same(fr) in seen or len(fr) > 60:
             continue
-        seen.add(fold(fr))
+        seen.add(same(fr))
         out.append(f"« {fr} » ({_short_src(o.source)})" if _sources() else
                    (f"« {fr} » (usage courant, à confirmer)" if o.domain == "appris" else f"« {fr} »"))
         if len(out) >= n:

@@ -1,4 +1,6 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/widgets.dart';
+
+import '../../widgets/dialogs.dart';
 
 import '../../features/onboarding/welcome_screen.dart';
 import '../chat/conversation_store.dart';
@@ -19,7 +21,7 @@ Future<void> endSession(BuildContext context) async {
   await appSettings.reset();
   contentRepository.clear();
   nav.pushAndRemoveUntil(
-    CupertinoPageRoute(builder: (_) => const WelcomeScreen()),
+    appRoute((_) => const WelcomeScreen()),
     (_) => false,
   );
 }

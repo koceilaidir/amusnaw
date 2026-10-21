@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -14,6 +13,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/filigree.dart';
 import '../../theme/mark.dart';
 import '../../widgets/common.dart';
+import '../../widgets/dialogs.dart';
 import '../tutor/tutor_chat_screen.dart';
 
 /// Écran 1 : « Azul. », langue détectée + bouton Changer, connexion rapide.
@@ -54,43 +54,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     });
   }
 
-  /// Petite fenêtre avec un ou deux champs ; renvoie les valeurs, ou null si annulé.
-  Future<List<String>?> _ask(String title, String? message, List<(String, TextInputType)> fields,
-      {String action = 'Continuer'}) {
-    final ctrls = [for (final _ in fields) TextEditingController()];
-    return showCupertinoDialog<List<String>>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Column(children: [
-          if (message != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(message)),
-          for (var i = 0; i < fields.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: CupertinoTextField(
-                controller: ctrls[i],
-                placeholder: fields[i].$1,
-                keyboardType: fields[i].$2,
-                autofocus: i == 0,
-                autocorrect: false,
-              ),
-            ),
-        ]),
-        actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.pop(ctx, [for (final c in ctrls) c.text.trim()]),
-            child: Text(action),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Connexion par e-mail : adresse (+ prénom), puis code à 6 chiffres reçu par e-mail.
   Future<void> _emailLogin() async {
-    final first = await _ask('Continuer avec un e-mail', 'On t’envoie un code à 6 chiffres.', [
+    final first = await showFields(context, 'Continuer avec un e-mail', 'On t’envoie un code à 6 chiffres.', [
       ('Ton adresse e-mail', TextInputType.emailAddress),
       ('Ton prénom (première fois)', TextInputType.name),
     ], action: 'Recevoir le code');
@@ -109,7 +75,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       if (mounted) setState(() => _busy = false);
     }
     if (!mounted) return;
-    final code = await _ask('Ton code', 'Envoyé à $email. Regarde aussi dans les spams.', [
+    final code = await showFields(context, 'Ton code', 'Envoyé à $email. Regarde aussi dans les spams.', [
       ('Code à 6 chiffres', TextInputType.number),
     ], action: 'Se connecter');
     if (code == null || code[0].isEmpty) return;
@@ -145,47 +111,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   /// Sans compte : on demande juste un prénom, sans Google ni Apple (utile aussi
   /// sur les téléphones sans services Google). Activé par --dart-define=TEST_LOGIN=true.
   Future<void> _testLogin() async {
-    final ctrl = TextEditingController();
-    final name = await showCupertinoDialog<String>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: const Text('Continuer sans compte'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(controller: ctrl, placeholder: 'Ton prénom', autofocus: true),
-        ),
-        actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Continuer'),
-          ),
-        ],
-      ),
-    );
-    if (name == null) return;
+    final r = await showFields(context, 'Continuer sans compte', null, [('Ton prénom', TextInputType.name)]);
+    if (r == null) return;
+    final name = r[0];
     await _signIn(() => authService.signInForTesting(name: name.isEmpty ? 'Testeur' : name));
   }
 
-  /// Espace choisi sur une carte (Apprendre par défaut après une simple connexion).
-  ChatMode? _pendingMode;
-
-  /// Entrée dans l'app, dans l'espace choisi.
+  /// Entrée dans l'app.
   void _startOnboarding() {
-    final mode = _pendingMode;
-    Navigator.of(context).pushReplacement(CupertinoPageRoute(
-      builder: (_) => TutorChatScreen(initialMode: mode),
-    ));
+    Navigator.of(context).pushReplacement(appRoute((_) => const TutorChatScreen()));
   }
 
   /// Peut-on commencer sans compte ? (site web, ou version de test de l'app)
   bool get _guestOk => kIsWeb || _testMode;
 
-  /// Carte « Apprendre » ou « Discuter » : on entre tout de suite dans l'espace choisi.
-  Future<void> _choose(ChatMode mode) async {
+  /// « Commencer » : on entre tout de suite, sans compte sur le site.
+  Future<void> _start() async {
     if (_busy) return;
-    _pendingMode = mode;
     if (kIsWeb) {
       // Comme les autres IA : pas de compte pour commencer (prénom demandé plus tard par le prof).
       await _signIn(() => authService.signInForTesting(name: ''));
@@ -222,81 +164,107 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         ],
       ];
 
-  /// « Que veux-tu faire ? » : les deux cartes, puis la connexion pour ceux qui ont un compte.
+  /// Le bouton « Commencer », puis la connexion pour ceux qui ont déjà un compte.
   Widget _choices(AppPalette p, {required bool wide}) {
     final account = _accountActions(p);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-      Text('Que veux-tu faire ?', style: AppTheme.serif(size: wide ? 40 : 28, color: p.text)),
-      const SizedBox(height: 8),
+      Text('Prêt à commencer ?', style: AppTheme.serif(size: wide ? 42 : 30, color: p.text)),
+      const SizedBox(height: 10),
       Text(
           _guestOk
-              ? 'Sans compte, tout de suite. Tu pourras en créer un pour garder ta progression.'
-              : 'Connecte-toi, puis choisis ton espace.',
-          style: TextStyle(fontSize: wide ? 17 : 15, color: p.text2, height: 1.4)),
-      SizedBox(height: wide ? 26 : 18),
-      _ModeCard(
-        tile: p.accent,
-        icon: Icon(CupertinoIcons.book, color: p.onAccent, size: 26),
-        title: 'Apprendre',
-        badge: 'Niveau A1',
-        text: wide
-            ? 'Un prof IA qui t’explique dans ta langue : leçons courtes, exercices corrigés, révisions au bon moment, progression unité par unité.'
-            : 'Leçons, exercices, progression',
-        onTap: _busy ? null : () => _choose(ChatMode.learn),
+              ? 'Sans compte, tout de suite. Ton prof te guide pas à pas et répond à toutes tes questions, '
+                  'en français ou en kabyle.'
+              : 'Connecte-toi : ton prof te guide pas à pas et répond à toutes tes questions.',
+          style: TextStyle(fontSize: wide ? 17 : 15.5, color: p.text2, height: 1.5)),
+      SizedBox(height: wide ? 30 : 22),
+      SizedBox(
+        height: 56,
+        child: FilledButton(
+          onPressed: _busy ? null : _start,
+          style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28))),
+          child: _busy
+              ? Spinner(size: 22, color: p.onAccent)
+              : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text('Commencer'),
+                  SizedBox(width: 10),
+                  Icon(Icons.arrow_forward_rounded, size: 20),
+                ]),
+        ),
       ),
-      const SizedBox(height: 14),
-      _ModeCard(
-        tile: p.ink,
-        icon: Icon(CupertinoIcons.chat_bubble_text, color: p.onInk, size: 26),
-        title: 'Discuter avec l’IA',
-        text: wide
-            ? 'Parle en kabyle, en français ou en mélangeant les deux. Fais traduire un texte, corriger ton kabyle, expliquer une expression.'
-            : 'En kabyle, en français, traduire',
-        chips: wide ? const ['Traduire', 'Corriger mon kabyle', 'Parler en taqbaylit'] : const [],
-        onTap: _busy ? null : () => _choose(ChatMode.talk),
-      ),
-      if (_busy) ...[
-        const SizedBox(height: 16),
-        const Center(child: CupertinoActivityIndicator()),
-      ],
       if (account.isNotEmpty) ...[
-        SizedBox(height: wide ? 30 : 22),
-        Text(_guestOk ? 'Déjà un compte ?' : 'Se connecter', style: TextStyle(fontSize: 15, color: p.text2)),
-        const SizedBox(height: 10),
+        SizedBox(height: wide ? 32 : 26),
+        Row(children: [
+          Expanded(child: Divider(color: p.separator, thickness: .5)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(_guestOk ? 'Déjà un compte ?' : 'Se connecter',
+                style: TextStyle(fontSize: 14, color: p.text2)),
+          ),
+          Expanded(child: Divider(color: p.separator, thickness: .5)),
+        ]),
+        const SizedBox(height: 16),
         ...account,
       ],
-      const SizedBox(height: 6),
+      const SizedBox(height: 10),
       const _DetectedLanguageCard(),
     ]);
   }
 
-  /// Grand écran : à gauche le panneau olivier de la marque, à droite les deux espaces.
+  /// Le paysage kabyle, fondu dans le vert olivier (multiplié, puis une touche de lumière).
+  static const _olive = Color(0xFF56662E);
+  Widget _greenLandscape() => Positioned.fill(
+        child: IgnorePointer(
+          child: ExcludeSemantics(
+            child: Stack(fit: StackFit.expand, children: [
+              Image.asset(Fond.olivier.asset,
+                  fit: BoxFit.fitWidth,
+                  alignment: Alignment.bottomCenter,
+                  color: _olive,
+                  colorBlendMode: BlendMode.multiply,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+              Opacity(
+                opacity: .22,
+                child: Image.asset(Fond.olivier.asset,
+                    fit: BoxFit.fitWidth,
+                    alignment: Alignment.bottomCenter,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+              ),
+            ]),
+          ),
+        ),
+      );
+
+  /// Grand écran : à gauche le panneau olivier avec le paysage, à droite « Commencer ».
   Widget _wideLayout(AppPalette p) => Row(children: [
         Expanded(
           flex: 5,
           child: Container(
-            color: const Color(0xFF56662E),
-            padding: const EdgeInsets.all(56),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                const AmusnawMark(size: 34, color: Color(0xFFF8F6F1)),
-                const SizedBox(width: 12),
-                Text('amusnaw',
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.w600, letterSpacing: -.4, color: Color(0xFFF8F6F1))),
-              ]),
-              const Spacer(),
-              Text('Azul.', style: AppTheme.serif(size: 104, color: const Color(0xFFF8F6F1))),
-              const SizedBox(height: 20),
-              const Text('Le kabyle, avec une IA\nqui parle ta langue.',
-                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w600, color: Color(0xFFF8F6F1), height: 1.2)),
-              const SizedBox(height: 14),
-              const Text(
-                  'Apprends pas à pas, ou parle directement en taqbaylit : l’IA comprend le mélange de kabyle et de français.',
-                  style: TextStyle(fontSize: 18, color: Color(0xD1F8F6F1), height: 1.5)),
-              const Spacer(),
-              const Text('Kabyle en écriture latine · Tifinagh',
-                  style: TextStyle(fontSize: 14, color: Color(0xB3F8F6F1))),
+            color: _olive,
+            child: Stack(fit: StackFit.expand, children: [
+              _greenLandscape(),
+              Padding(
+                padding: const EdgeInsets.all(56),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Row(children: [
+                    AmusnawMark(size: 34, color: Color(0xFFF8F6F1)),
+                    SizedBox(width: 12),
+                    Text('amusnaw',
+                        style: TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w600, letterSpacing: -.4, color: Color(0xFFF8F6F1))),
+                  ]),
+                  const Spacer(flex: 2),
+                  Text('Azul.', style: AppTheme.serif(size: 104, color: const Color(0xFFF8F6F1))),
+                  const SizedBox(height: 20),
+                  const Text('Le kabyle, avec une IA\nqui parle ta langue.',
+                      style: TextStyle(fontSize: 30, fontWeight: FontWeight.w600, color: Color(0xFFF8F6F1), height: 1.2)),
+                  const SizedBox(height: 14),
+                  const Text('Des leçons courtes, des exercices corrigés, et un prof qui répond à toutes tes questions.',
+                      style: TextStyle(fontSize: 18, color: Color(0xD1F8F6F1), height: 1.5)),
+                  const Spacer(flex: 3),
+                  const Text('Kabyle en écriture latine · Tifinagh',
+                      style: TextStyle(fontSize: 14, color: Color(0xB3F8F6F1))),
+                ]),
+              ),
             ]),
           ),
         ),
@@ -304,19 +272,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           flex: 6,
           child: ColoredBox(
             color: p.bg,
-            child: Stack(children: [
-              // la vallée, en entier, calée en bas
-              const Aquarelle(Fond.vallee, opacity: .45, fit: BoxFit.fitWidth),
-              Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 40),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 560),
-                    child: _choices(p, wide: true),
-                  ),
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 40),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  child: _choices(p, wide: true),
                 ),
               ),
-            ]),
+            ),
           ),
         ),
       ]);
@@ -327,122 +291,39 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     if (isWide(context)) return Scaffold(body: _wideLayout(p));
     return Scaffold(
       backgroundColor: p.bg,
-      body: Stack(children: [
-        const Aquarelle(Fond.olivier, opacity: .5, height: 300, alignment: Alignment(-.25, 1)),
-        CustomScrollView(slivers: [
-          SliverToBoxAdapter(
-            child: Container(
-              color: const Color(0xFF56662E),
-              padding: EdgeInsets.fromLTRB(24, MediaQuery.paddingOf(context).top + 28, 24, 28),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  const AmusnawMark(size: 28, color: Color(0xFFF8F6F1)),
-                  const SizedBox(width: 10),
-                  Text('amusnaw',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFFF8F6F1))),
-                ]),
-                const SizedBox(height: 26),
-                Text('Azul.', style: AppTheme.serif(size: 64, color: const Color(0xFFF8F6F1))),
-                const SizedBox(height: 10),
-                const Text('Le kabyle, avec une IA qui parle ta langue.',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, height: 1.25, color: Color(0xFFF8F6F1))),
-              ]),
-            ),
-          ),
-          SliverSafeArea(
-            top: false,
-            sliver: SliverPadding(
-              padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
-              sliver: SliverToBoxAdapter(child: _choices(p, wide: false)),
-            ),
-          ),
-        ]),
-      ]),
-    );
-  }
-}
-
-/// Grande carte d'un espace (Apprendre / Discuter), comme sur la maquette.
-class _ModeCard extends StatelessWidget {
-  const _ModeCard({
-    required this.tile,
-    required this.icon,
-    required this.title,
-    required this.text,
-    required this.onTap,
-    this.badge,
-    this.chips = const [],
-  });
-  final Color tile;
-  final Widget icon;
-  final String title, text;
-  final String? badge;
-  final List<String> chips;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = AppPalette.of(context);
-    return Semantics(
-      button: true,
-      label: title,
-      child: Material(
-        color: p.surface,
-        borderRadius: BorderRadius.circular(24),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: onTap,
+      body: CustomScrollView(slivers: [
+        SliverToBoxAdapter(
           child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 18, 20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: p.separator, width: .5),
-              boxShadow: p.shadow,
-            ),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                width: 52,
-                height: 52,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: tile, borderRadius: BorderRadius.circular(16)),
-                child: icon,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 10, runSpacing: 4, children: [
-                    Text(title, style: TextStyle(fontSize: 21, fontWeight: FontWeight.w600, color: p.text)),
-                    if (badge != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(color: p.accentSoft, borderRadius: BorderRadius.circular(999)),
-                        child: Text(badge!,
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: p.accentText)),
-                      ),
-                  ]),
-                  const SizedBox(height: 6),
-                  Text(text, style: TextStyle(fontSize: 15, height: 1.45, color: p.text2)),
-                  if (chips.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      for (final c in chips)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-                          decoration: BoxDecoration(color: p.fill, borderRadius: BorderRadius.circular(999)),
-                          child: Text(c, style: TextStyle(fontSize: 13, color: p.text)),
-                        ),
-                    ]),
-                  ],
-                ]),
-              ),
+            color: _olive,
+            child: Stack(children: [
+              _greenLandscape(),
               Padding(
-                padding: const EdgeInsets.only(top: 14),
-                child: Icon(CupertinoIcons.chevron_right, size: 18, color: p.text2),
+                padding: EdgeInsets.fromLTRB(24, MediaQuery.paddingOf(context).top + 28, 24, 96),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Row(children: [
+                    AmusnawMark(size: 28, color: Color(0xFFF8F6F1)),
+                    SizedBox(width: 10),
+                    Text('amusnaw',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFFF8F6F1))),
+                  ]),
+                  const SizedBox(height: 26),
+                  Text('Azul.', style: AppTheme.serif(size: 64, color: const Color(0xFFF8F6F1))),
+                  const SizedBox(height: 10),
+                  const Text('Le kabyle, avec une IA qui parle ta langue.',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, height: 1.25, color: Color(0xFFF8F6F1))),
+                ]),
               ),
             ]),
           ),
         ),
-      ),
+        SliverSafeArea(
+          top: false,
+          sliver: SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 26, 20, 24),
+            sliver: SliverToBoxAdapter(child: _choices(p, wide: false)),
+          ),
+        ),
+      ]),
     );
   }
 }
@@ -455,79 +336,38 @@ class _DetectedLanguageCard extends StatelessWidget {
     final p = AppPalette.of(context);
     return ValueListenableBuilder(
       valueListenable: localeController,
-      builder: (context, lang, _) => Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-        decoration: BoxDecoration(
-          color: p.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: p.separator, width: .5),
-          boxShadow: p.shadow,
-        ),
-        child: Row(
-          children: [
-            Icon(CupertinoIcons.globe, color: p.accent, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(lang.line, style: TextStyle(fontSize: 15, color: p.text)),
-                  if (localeController.detected)
-                    Text(kIsWeb ? 'Détectée dans ton navigateur' : 'Détectée sur ton téléphone',
-                        style: TextStyle(fontSize: 13, color: p.text2)),
-                ],
-              ),
+      builder: (context, lang, _) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(children: [
+          Icon(Icons.translate_rounded, color: p.text2, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+                localeController.detected
+                    ? '${lang.line} · ${kIsWeb ? 'détectée dans ton navigateur' : 'détectée sur ton téléphone'}'
+                    : lang.line,
+                style: TextStyle(fontSize: 14, color: p.text2)),
+          ),
+          TextButton(
+            onPressed: () => _pick(context),
+            style: TextButton.styleFrom(
+              foregroundColor: p.accentText,
+              textStyle: const TextStyle(fontFamily: AppTheme.font, fontSize: 14, fontWeight: FontWeight.w600),
             ),
-            CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              minSize: 34,
-              color: p.accentSoft,
-              borderRadius: BorderRadius.circular(17),
-              onPressed: () => _showLanguageSheet(context),
-              child: Text('Changer',
-                  style: TextStyle(
-                      color: p.accentText,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600)),
-            ),
-          ],
-        ),
+            child: const Text('Changer'),
+          ),
+        ]),
       ),
     );
   }
 
-  void _showLanguageSheet(BuildContext context) {
-    final p = AppPalette.of(context);
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: p.bg,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: CupertinoListSection.insetGrouped(
-            margin: EdgeInsets.zero,
-            backgroundColor: p.bg,
-            header: const Text('LA LANGUE DANS LAQUELLE TON PROF EXPLIQUE'),
-            footer: const Text('D’autres langues arrivent.'),
-            children: [
-              for (final l in supportedTutorLanguages)
-                CupertinoListTile(
-                  title: Text(l.label, style: TextStyle(color: p.text)),
-                  trailing: l.code == localeController.value.code
-                      ? Icon(CupertinoIcons.check_mark, color: p.accent, size: 20)
-                      : null,
-                  onTap: () {
-                    localeController.choose(l);
-                    Navigator.of(ctx).pop();
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
+  Future<void> _pick(BuildContext context) async {
+    final l = await showChoice<TutorLanguage>(
+      context,
+      'Ton prof explique en',
+      {for (final l in supportedTutorLanguages) l: l.label},
+      selected: localeController.value,
     );
+    if (l != null) localeController.choose(l);
   }
 }

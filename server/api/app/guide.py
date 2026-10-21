@@ -13,17 +13,37 @@ from .knowledge import fold
 
 NEXT = re.compile(
     r"\b(apprendre|apprends|continu\w*|la suite|suite|suivant\w*|autre chose|change\w*|nouveau\w*|"
-    r"nouvelle\w*|retenu|le[çc]on|avance\w*|encore|vas-y|go)\b", re.I)
+    r"nouvelle\w*|retenu|le[çc]on|avance\w*|encore|vas-y|go|reprend\w*)\b", re.I)
 NOT_NEXT = re.compile(r"\b(comment|que veut|veut dire|conjug|pourquoi|c'est quoi|traduis|explique)\b", re.I)
 
 SUGGEST_STEP = ["Continuer", "Explique-moi cette phrase", "Parlons d'autre chose"]
 
 # Dernier pas proposé à chaque élève (mémoire du serveur ; perdue au redémarrage, sans gravité)
 _state: dict[str, dict] = {}
+_last: dict[str, tuple[str, dict]] = {}
+
+REPEAT = re.compile(r"\b(refai\w*|recommenc\w*|r[ée]p[èée]t\w*|encore une fois|une autre fois|"
+                    r"r[ée]essa\w*)\b.*\b(exercice|le[çc]on|phrase|[çc]a|celui-ci|celle-ci|mot)\b"
+                    r"|^\s*(?:encore|recommence|on recommence|refais)\s*!?\s*$", re.I)
+
+
+def repeat(user_id: str, message: str) -> str | None:
+    """« Je veux refaire cet exercice » : le même pas de la leçon, à l'identique (rien d'inventé)."""
+    if len(message) > 90 or not REPEAT.search(message) or user_id not in _last:
+        return None
+    _offered.discard(user_id)
+    text, st = _last[user_id]
+    _state[user_id] = dict(st)  # la réponse sera de nouveau vérifiée
+    return "On recommence, prends ton temps.\n\n" + text
 
 
 YES = re.compile(r"^\s*(oui|ouais|ok|okay|d'accord|dac|vas-y|allez|go|yes|ih|wah|on y va)\b", re.I)
 _offered: set[str] = set()  # élèves à qui l'on vient de proposer la suite
+
+
+def offer(user_id: str) -> None:
+    """On vient de proposer de reprendre la leçon : un simple « oui » la relance."""
+    _offered.add(user_id)
 
 
 def wants_next(message: str, intent: str | None, user_id: str = "") -> bool:
@@ -67,8 +87,19 @@ def step(seen: set[str], user_id: str = "", name: str = "") -> tuple[str, dict[s
     else:
         parts.append(f"Tu as vu tous les mots de **{unit['title']}**. On révise avant de passer à la suite :")
         parts += [f"- « {w['kab']} » : {w['fr']}" for w in words]
-    chunk = chunks[(done_before // 2) % len(chunks)] if chunks else None
-    if chunk:
+    i = done_before // 2
+    chunk = chunks[i % len(chunks)] if chunks else None
+    # Phrase déjà vue : on ne la recopie pas, on la retrouve de mémoire à partir du français
+    # (se rappeler fixe mieux que relire : Roediger & Karpicke 2006 ; difficulté désirable : Bjork 1994).
+    recall = bool(chunk) and (i >= len(chunks) or not new)
+    if recall:
+        parts.append("")
+        parts.append(_pick(rng, [
+            f"Petit défi de mémoire : comment dirais-tu « {chunk['fr'].split(' (')[0].rstrip(' .')} » ? Sans regarder plus haut !",
+            f"On a vu cette phrase tout à l'heure. Retrouve-la : « {chunk['fr'].split(' (')[0].rstrip(' .')} » ?",
+            f"Sans regarder : écris en kabyle « {chunk['fr'].split(' (')[0].rstrip(' .')} ».",
+        ]))
+    elif chunk:
         parts.append("")
         parts.append(_pick(rng, [
             f"Et une phrase qu'on entend tout le temps : « {chunk['kab']} » — {chunk['fr']}",
@@ -92,6 +123,8 @@ def step(seen: set[str], user_id: str = "", name: str = "") -> tuple[str, dict[s
                            "fr": chunk["fr"] if chunk else "", "all_chunks": [c["kab"] for c in chunks],
                            "vocab": [w["kab"] for w in words] + [t for c in chunks
                                                                  for t in re.split(r"[\s\-]+", c["kab"].strip(" !?.,")) if t]}
+    if user_id:
+        _last[user_id] = ("\n".join(parts), dict(_state[user_id]))
     return "\n".join(parts), keys
 
 
@@ -125,6 +158,15 @@ def _near_miss(said: str, vocab: list[str]) -> str | None:
     return None
 
 
+def _letters(said: str, good: str) -> str:
+    """Juste au son près, mais une lettre spéciale manque (iqreh → iqreḥ) : on le signale gentiment."""
+    have = {fold(w): w for w in re.findall(r"[^\W\d_]+", said.lower())}
+    miss = [w for w in re.findall(r"[^\W\d_]+", good.lower()) if fold(w) in have and have[fold(w)] != w]
+    if not miss:
+        return ""
+    return f" Petit détail d'écriture : on écrit « {', '.join(dict.fromkeys(miss))} », avec les lettres kabyles."
+
+
 def check_answer(user_id: str, message: str) -> str | None:
     """Si l'élève répond au dernier pas de la leçon : bravo, ou correction douce.
     Renvoie None si le message n'est pas une réponse (le modèle prend le relais)."""
@@ -144,11 +186,12 @@ def check_answer(user_id: str, message: str) -> str | None:
         if _plain(c).replace(" ", "") and _plain(c).replace(" ", "") in flat:
             _state.pop(user_id, None)
             _offered.add(user_id)
-            return _pick(rng, bravo).format(t=c) + " " + _pick(rng, more)
+            return _pick(rng, bravo).format(t=c) + _letters(message, c) + " " + _pick(rng, more)
     # 2. la phrase attendue, à une ou deux lettres près
     if st["chunk"]:
         want = _plain(st["chunk"]).replace(" ", "")
-        if abs(len(want) - len(flat)) <= 3 and _dist(flat, want) <= 2:
+        tol = max(2, len(want) // 5)
+        if abs(len(want) - len(flat)) <= tol + 1 and _dist(flat, want) <= tol:
             return f"Presque ! On écrit « {st['chunk']} ». " + _pick(rng, ["Réessaie une fois, pour le fixer.",
                                                                           "Écris-le encore une fois ?"])
     targets = st["words"]

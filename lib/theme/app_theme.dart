@@ -144,8 +144,15 @@ class AppTheme {
       useMaterial3: true,
       brightness: b,
       fontFamily: font,
-      // Comportements iOS (retour par glissement, rebond) sur toutes les plateformes.
-      platform: TargetPlatform.iOS,
+      // Pas d'animation de glissement entre les pages : le contenu change sur place, comme un site.
+      pageTransitionsTheme: const PageTransitionsTheme(builders: {
+        TargetPlatform.android: _NoTransition(),
+        TargetPlatform.iOS: _NoTransition(),
+        TargetPlatform.macOS: _NoTransition(),
+        TargetPlatform.windows: _NoTransition(),
+        TargetPlatform.linux: _NoTransition(),
+        TargetPlatform.fuchsia: _NoTransition(),
+      }),
       colorScheme: ColorScheme.fromSeed(
         seedColor: p.accent,
         brightness: b,
@@ -184,6 +191,15 @@ class AppTheme {
       ),
     );
   }
+}
+
+class _NoTransition extends PageTransitionsBuilder {
+  const _NoTransition();
+
+  @override
+  Widget buildTransitions<T>(PageRoute<T> route, BuildContext context, Animation<double> animation,
+          Animation<double> secondaryAnimation, Widget child) =>
+      child;
 }
 
 /// Police Onest aussi pour les widgets Cupertino (listes, barres).

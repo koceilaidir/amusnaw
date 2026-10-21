@@ -11,4 +11,7 @@ class AppConfig {
 
   /// ID client OAuth « Web » de Google Cloud (le serveur vérifie ce jeton).
   static const googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+
+  /// Nom et version de l'IA, affichés sous la zone de saisie du chat.
+  static const aiName = 'amusnaw 1.0';
 }

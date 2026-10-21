@@ -99,6 +99,23 @@ class SavedConversation(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class QaReview(Base):
+    """Question libre d'un élève et réponse du modèle, SANS lien avec le compte
+    (anonyme) : relues sur /review, les réponses corrigées servent à entraîner le prof."""
+
+    __tablename__ = "qa_reviews"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(String(80), default="")
+    status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | ok | fixed | rejected
+    fixed: Mapped[str] = mapped_column(Text, default="")
+    reviewer: Mapped[str] = mapped_column(String(80), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Review(Base):
     """Décision du linguiste sur une entrée de la base (mot ou paire)."""
 

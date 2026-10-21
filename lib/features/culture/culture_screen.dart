@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
 import '../../content/sample_content.dart';
 import '../../core/content/content_repository.dart';
@@ -25,7 +25,7 @@ class _CultureScreenState extends State<CultureScreen> {
           largeTitleBar(context, 'Culture et histoire'),
           if (snap.data == null)
             const SliverToBoxAdapter(
-              child: Padding(padding: EdgeInsets.all(32), child: CupertinoActivityIndicator()),
+              child: Padding(padding: EdgeInsets.all(32), child: Center(child: Spinner())),
             )
           else
             SliverPadding(
