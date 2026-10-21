@@ -12,7 +12,7 @@ import re
 
 from . import conjugation
 from .config import get_settings
-from .content import _clean_fr, _rank
+from .content import _clean_fr, _rank, capsules
 from .knowledge import Item, fold, kb
 
 ARTICLES = r"^(?:(?:le|la|les|un|une|des|du|de\s+la|de|mon|ma|mes|ton|ta|tes|son|sa|ses)\s+|(?:l|d)['’]\s*)+"
@@ -275,6 +275,30 @@ def is_off_topic(message: str) -> str | None:
                                        "soigner")) else OFF_TOPIC
 
 
+# Culture : les fiches vérifiées répondent elles-mêmes (le modèle inventait des faits sur Yennayer…)
+_CULTURE = re.compile(r"\b(parle[- ]moi|raconte|c['’]est quoi|qu['’]est[- ]ce que|qui (?:était|est|étaient)|"
+                      r"explique|histoire d|que sais[- ]tu|connais[- ]tu|dis[- ]moi)", re.I)
+_GENERIC_TAGS = {"histoire", "village", "littérature", "langue", "artisanat", "société", "écriture", "identité",
+                 "femmes", "poésie", "fête", "calendrier", "argent", "bijoux", "motifs", "olives", "résistance", "tizi",
+                 "hca", "entraide", "alphabet"}
+
+
+def capsule_reply(message: str) -> str | None:
+    """« Parle-moi de Yennayer » : réponse tirée de la fiche culturelle vérifiée."""
+    if not _CULTURE.search(message):
+        return None
+    m = f" {fold(message)} "
+    for c in capsules():
+        title = re.sub(r"^(?:le |la |les |l'|l’|une |un )", "", c["title"], flags=re.I)
+        names = [title] + [t for t in c.get("tags", []) if t not in _GENERIC_TAGS and len(t) >= 4]
+        if any(f" {fold(n)}" in m for n in names):
+            t = c["title"]
+            t = t[0].lower() + t[1:] if re.match(r"(?:Le|La|Les|L'|L’|Une|Un)\b", t) else t
+            return (f"Avec plaisir, voici l'essentiel sur {t}. "
+                    "Tu veux apprendre les mots kabyles qui vont avec ?\n[[CAPSULE: " + c["id"] + "]]")
+    return None
+
+
 def direct_reply(message: str, language: str = "fr") -> str | None:
     """Réponse exacte écrite par le serveur, ou None pour laisser parler le modèle."""
     msg = message.strip()
@@ -284,6 +308,9 @@ def direct_reply(message: str, language: str = "fr") -> str | None:
     off = is_off_topic(msg)
     if off:
         return off
+    cap = capsule_reply(msg)
+    if cap:
+        return cap
     m = _CONJ.search(msg)
     if m:
         x = _strip(m.group("x"))

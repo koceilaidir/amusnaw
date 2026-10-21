@@ -87,6 +87,8 @@ def good_sentence(s: str, lo: int = 3, hi: int = 40) -> bool:
 def good_pair(fr: str, kab: str) -> bool:
     if not fr or not kab or norm(fr) == norm(kab):
         return False
+    if not re.search(r"[^\W\d_]{2}", fr) or not re.search(r"[^\W\d_]{2}", kab):  # entrée abîmée (« : », « ( »…)
+        return False
     a, b = len(fr), len(kab)
     if a > 400 or b > 400:
         return False

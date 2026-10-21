@@ -52,6 +52,19 @@ Le score « quotidien » de ce repère est flatteur : Tatoeba contient beaucoup 
 
 NLLB comprend bien le kabyle (vers le français), mais écrit un kabyle approximatif. Défauts vus : « grand-mère » traduit par « ma femme », noms de lieux en français (Tizi Ouzou).
 
+## amusnaw-mt v1 en ligne (21 octobre 2026)
+
+NLLB réentraîné sur Kaggle (1 h d'entraînement) avec 240 000 paires humaines et 300 000 paires rétro-traduites. Mesuré sur le VPS :
+
+| Sens | NLLB de base | **amusnaw-mt** |
+|---|---|---|
+| français → kabyle, quotidien | 35,5 | **46,3** |
+| français → kabyle, livres | 26,9 | **35,3** |
+| kabyle → français, quotidien | 47,9 | **55,6** |
+| kabyle → français, livres | 33,2 | **38,9** |
+
+Pistes pour une v2 : rétro-traduire les 869 000 phrases (au lieu de 300 000), deux passages sur les données (l'entraînement n'a pris qu'une heure sur les 6 h 30 possibles).
+
 ## Étape 2 : entraîner amusnaw-mt (gratuit, sur Kaggle)
 
 ### 1. Fabriquer les données (sur le PC)

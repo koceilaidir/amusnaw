@@ -114,13 +114,21 @@ async def main():
     if args.n:
         items = items[: args.n // 2] + [p for p in items if p["set"] == "livres"][: args.n - args.n // 2]
     report = {"date": time.strftime("%Y-%m-%d %H:%M"), "phrases": len(items), "scores": {}, "exemples": []}
+    # nom du modèle chargé par le service de traduction (NLLB de base ou amusnaw-mt)
+    engine = "NLLB"
+    try:
+        import httpx  # noqa: PLC0415
+        m = httpx.get(get_settings().mt_url.rstrip("/") + "/health", timeout=5).json().get("model", "")
+        engine = "amusnaw-mt" if "amusnaw" in m else "NLLB"
+    except Exception:  # noqa: BLE001
+        pass
     for src, tgt in (("fr", "kab"), ("kab", "fr")):
         engines = {"mémoire (phrase proche)": _nearest(items, src, tgt)}
         t = time.time()
         nl = await _nllb(items, src, tgt)
         if nl is not None:
-            engines["NLLB"] = nl
-            print(f"NLLB {src}→{tgt} : {len(items)} phrases en {time.time() - t:.0f} s", flush=True)
+            engines[engine] = nl
+            print(f"{engine} {src}→{tgt} : {len(items)} phrases en {time.time() - t:.0f} s", flush=True)
         else:
             print("NLLB indisponible (service « mt » lancé ?)", flush=True)
         for name, hyps in engines.items():
@@ -128,9 +136,9 @@ async def main():
                 sc = [chrf(h, p[tgt]) for h, p in zip(hyps, items) if p["set"] == subset]
                 if sc:
                     report["scores"][f"{src}→{tgt} | {name} | {subset}"] = round(sum(sc) / len(sc), 1)
-        if "NLLB" in engines:
-            for h, p in list(zip(engines["NLLB"], items))[:8]:
-                report["exemples"].append({"sens": f"{src}→{tgt}", "source": p[src], "humain": p[tgt], "NLLB": h})
+        if engine in engines:
+            for h, p in list(zip(engines[engine], items))[:8]:
+                report["exemples"].append({"sens": f"{src}→{tgt}", "source": p[src], "humain": p[tgt], engine: h})
     Path(args.out).write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
     print("\nScores chrF (0–100, plus haut = mieux) :")
     for k, v in report["scores"].items():
