@@ -125,7 +125,7 @@ class AuthService {
         ...body,
         'interface_language': localeController.value.code,
       }),
-    );
+    ).timeout(const Duration(seconds: 20)); // jamais de roue qui tourne sans fin
     if (res.statusCode != 200) throw AuthException(_detail(res, 'Connexion impossible (${res.statusCode}).'));
     final json = jsonDecode(res.body) as Map<String, dynamic>;
     final session = AuthSession(

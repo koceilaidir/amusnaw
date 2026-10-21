@@ -7,7 +7,11 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 from .config import get_settings
 
 _settings = get_settings()
-engine = create_engine(_settings.database_url, pool_pre_ping=True)
+# Garde-fous : une requête n'attend jamais un verrou plus de 10 s, et une transaction
+# oubliée est fermée au bout de 5 min (sinon tout le serveur peut rester bloqué).
+_pg = {"options": "-c lock_timeout=10000 -c idle_in_transaction_session_timeout=300000"}
+engine = create_engine(_settings.database_url, pool_pre_ping=True,
+                       connect_args=_pg if _settings.database_url.startswith("postgresql") else {})
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 

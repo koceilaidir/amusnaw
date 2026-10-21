@@ -357,6 +357,7 @@ async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = D
     chat_limit.check(str(user.id))
     ready = await _translation(body, user, db)
     profile, newly, system, history, direct = _prepare_turn(body, user, db, ready)
+    db.commit()  # rien de verrouillé pendant que le modèle écrit (sinon blocage si l'élève renvoie)
     if direct:
         return _finish_turn(db, user, profile, body.message, direct, False, newly, body.intent, direct)
     if system is None:
@@ -379,6 +380,7 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
     """
     ready = await _translation(body, user, db)
     profile, newly, system, history, direct = _prepare_turn(body, user, db, ready)
+    db.commit()  # rien de verrouillé pendant que le modèle écrit (sinon blocage si l'élève renvoie)
 
     def event(obj: dict) -> str:
         return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
