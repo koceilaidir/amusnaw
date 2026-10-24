@@ -19,8 +19,8 @@ from .config import get_settings
 from .limits import chat_limit, signup_limit
 from .db import (ChatMessage, LearnedWord, LearnerProfile, QaReview, Review, SavedConversation, SessionLocal, User,
                  get_db, init_db, now)
-from .knowledge import kb
-from . import answers, content, email_login, guide, learning, router, spell, translate
+from .knowledge import fold, kb
+from . import answers, content, email_login, flavor, guide, learning, router, spell, translate
 
 
 _BACKGROUND: set = set()  # tâches de fond gardées en vie
@@ -277,11 +277,24 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session, ready: str | None = N
             return profile, newly_learned, None, None, ans
         if guide.wants_next(body.message, body.intent, user.id):
             seen = set(db.scalars(select(LearnedWord.word_key).where(LearnedWord.user_id == user.id)))
-            reply, keys = guide.step(seen, user.id, (user.name or "").strip().title())
+            name = (user.name or "").strip().title()
+            unit = content.current_unit(seen)
+            reply, keys = guide.step(seen, user.id, name)
             if reply:
                 learning.introduce(db, user.id, keys, "lesson")
                 db.commit()  # enregistré tout de suite : la leçon suivante part de là
                 _SUGGEST[user.id] = list(guide.SUGGEST_STEP)
+                # prof « plus IA » : une phrase en français du modèle avant l'étape (voir flavor.py)
+                words = [w for w in (unit or {}).get("words", []) if fold(w["kab"]) in keys]
+                last = db.scalars(select(ChatMessage).where(ChatMessage.user_id == user.id)
+                                  .order_by(ChatMessage.created_at.desc()).limit(4)).all()
+                _FLAVOR[user.id] = dict(
+                    name=name, message=body.message, unit=unit,
+                    history=[{"role": m.role, "content": m.content} for m in reversed(last)],
+                    new_words_fr=[w["fr"] for w in words], goals=list(profile.goals or []),
+                    background=profile.background or "", days_away=_days_away(profile),
+                    lesson_kab=[w["kab"] for w in (unit or {}).get("words", [])]
+                    + [c["kab"] for c in (unit or {}).get("chunks", [])])
                 return profile, newly_learned, None, None, reply
     recent = db.scalars(
         select(ChatMessage).where(ChatMessage.user_id == user.id)
@@ -371,6 +384,27 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
     }
 
 
+# Contexte pour la phrase du modèle avant une étape de leçon (posé par _prepare_turn)
+_FLAVOR: dict[str, dict] = {}
+
+
+def _days_away(profile) -> int:
+    last = profile.last_session_at
+    if last is None:
+        return 0
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    return max(0, (now() - last).days)
+
+
+async def _with_flavor(user_id: str, direct: str) -> str:
+    ctx = _FLAVOR.pop(user_id, None)
+    if not ctx:
+        return direct
+    intro = await flavor.lesson_intro(**ctx)
+    return f"{intro}\n\n{direct}" if intro else direct
+
+
 # Réponses rapides à proposer sous la prochaine réponse (posées par _prepare_turn)
 _SUGGEST: dict[str, list[str]] = {}
 QUESTION_SUGGEST = ("Reprendre la leçon", "J'ai une autre question")
@@ -396,6 +430,7 @@ async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = D
     profile, newly, system, history, direct = _prepare_turn(body, user, db, ready)
     db.commit()  # rien de verrouillé pendant que le modèle écrit (sinon blocage si l'élève renvoie)
     if direct:
+        direct = await _with_flavor(user.id, direct)
         return _finish_turn(db, user, profile, body.message, direct, False, newly, body.intent, direct,
                             by_model=False)
     if system is None:
@@ -424,7 +459,11 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
         return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
 
     async def gen():
+        nonlocal direct
         if direct:
+            if user.id in _FLAVOR:
+                yield ": le prof réfléchit\n\n"
+                direct = await _with_flavor(user.id, direct)
             shown, _ = content.strip_markers(direct)
             yield event({"type": "delta", "text": shown})
             yield event({"type": "done", **_finish_turn(db, user, profile, body.message, direct, False, newly,
