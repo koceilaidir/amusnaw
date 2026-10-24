@@ -262,10 +262,10 @@ def _mean(rng: random.Random, it: Item) -> str:
     return f"« {k} » veut dire « {shown} ».{src}{other_senses(it)}{modern} {ask}\n[[MOT: {it.kab}]]"
 
 
-MISSING_FR = ("Je n'ai pas encore « {x} » dans ma base vérifiée, et je préfère ne pas l'inventer. "
-              "Tu peux me demander un autre mot, ou on continue la leçon ?")
-MISSING_KAB = ("Je ne trouve pas « {x} » dans ma base vérifiée, donc je ne vais pas deviner son sens. "
-               "Vérifie l'orthographe (ɣ, ɛ, ḍ…) ou donne-moi la phrase où tu l'as vu.")
+MISSING_FR = ("Désolé, je n'ai pas encore « {x} » dans ma base vérifiée, et je préfère ne pas l'inventer. "
+              "J'ai noté ta question : un kabylophone va la vérifier, et je saurai te répondre la prochaine fois.")
+MISSING_KAB = ("Désolé, je ne trouve pas « {x} » dans ma base vérifiée, donc je ne vais pas deviner son sens. "
+               "Vérifie l'orthographe (ɣ, ɛ, ḍ…). J'ai noté ta question : un kabylophone va la vérifier.")
 OFF_TOPIC = ("Je ne peux pas t'aider pour ça : je suis là uniquement pour le kabyle, sa culture et son "
              "histoire. On reprend ta leçon ?")
 MEDICAL = ("Pour ta santé, demande plutôt à un médecin ou à un pharmacien : je ne donne pas de conseil "

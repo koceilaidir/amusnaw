@@ -96,7 +96,9 @@ def _norm(s: str) -> str:
 
 def _tm_rows(data_dir: Path):
     """Paires humaines : Tatoeba (CC BY 2.0 FR) et livres bilingues (paires jugées sûres)."""
-    for name, src in (("tatoeba_fr.jsonl", "Tatoeba"), ("parallel_petit_prince.jsonl", "livre"),
+    for name, src in (("tatoeba_fr.jsonl", "Tatoeba"), ("bouamara_niveaux.jsonl", "Bouamara"),
+                      ("assimil_poche.jsonl", "Assimil"),
+                      ("parallel_petit_prince.jsonl", "livre"),
                       ("parallel_feraoun.jsonl", "livre"), ("parallel_camus.jsonl", "livre")):
         p = data_dir / name
         if not p.exists():

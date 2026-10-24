@@ -5,7 +5,7 @@
 // Le script peut être relancé sans risque.
 import 'dart:io';
 
-const title = 'Amusnaw — apprendre le kabyle';
+const title = 'Amusnaw';
 const description =
     'Amusnaw, un prof IA pour apprendre le kabyle, sa culture et son histoire, un petit pas par jour.';
 const olive = '#56662E';

@@ -199,7 +199,7 @@
       el.tabIndex = 0;
       el.innerHTML = `
         <div class="row" style="justify-content:space-between">
-          <span class="src">${esc(it.source)}</span>
+          <span></span>
           ${it.confident ? "" : '<span class="tag doubt">Alignement douteux</span>'}
         </div>
         <label for="k-${it.id}">Kabyle</label>
@@ -230,12 +230,13 @@
       el.innerHTML = `
         <div class="row" style="justify-content:space-between">
           <span class="src">${new Date(it.at).toLocaleString("fr-FR")}</span>
-          <span class="tag" style="background:var(--fill);color:var(--text2)">${esc(it.model || "")}</span>
+          ${it.unknown ? '<span class="tag doubt">Le prof n’a pas su répondre</span>' : ""}
         </div>
         <label>Question de l'élève</label>
         <div class="question">${esc(it.question)}</div>
-        <label for="a-${it.id}">Réponse du prof</label>
-        <textarea id="a-${it.id}" rows="5">${esc(it.answer)}</textarea>
+        <label for="a-${it.id}">${it.unknown ? "La bonne réponse" : "Réponse du prof"}</label>
+        <textarea id="a-${it.id}" rows="5" placeholder="Écrivez la réponse que le prof devra donner la prochaine fois…">${esc(it.answer)}</textarea>
+        ${it.unknown && it.draft ? `<p class="hint" style="margin:8px 0 0">Brouillon du modèle, non montré à l'élève : ${esc(it.draft)}</p>` : ""}
         <div class="row" style="margin-top:12px">
           <button class="ok">Juste</button>
           <button class="fix">Enregistrer la correction</button>
@@ -244,6 +245,8 @@
       const [okB, fixB, rejB] = el.querySelectorAll("button");
       const send = async status => {
         const answer = document.getElementById("a-" + it.id).value.trim();
+        if (status === "fixed" && !answer) { document.getElementById("a-" + it.id).focus(); return; }
+        if (status === "ok" && it.unknown && !it.draft) return;
         await api(`/review/qa/${it.id}`, { method: "POST", body: JSON.stringify({ status, answer, reviewer }) });
         el.classList.add("done");
         el.querySelectorAll("button, textarea").forEach(x => x.disabled = true);

@@ -20,7 +20,7 @@ from .limits import chat_limit, signup_limit
 from .db import (ChatMessage, LearnedWord, LearnerProfile, QaReview, Review, SavedConversation, SessionLocal, User,
                  get_db, init_db, now)
 from .knowledge import kb
-from . import content, email_login, guide, learning, router, spell, translate
+from . import answers, content, email_login, guide, learning, router, spell, translate
 
 
 _BACKGROUND: set = set()  # tâches de fond gardées en vie
@@ -257,6 +257,9 @@ def _prepare_turn(body: "ChatIn", user: User, db: Session, ready: str | None = N
     if _ANOTHER.match(body.message):
         return profile, newly_learned, None, None, ("Vas-y, je t'écoute ! Un mot, une phrase, la grammaire, "
                                                     "la culture kabyle : pose ta question.")
+    # Question déjà relue sur /review : la bonne réponse tout de suite (le prof a « appris »)
+    if body.intent not in ("correct", "translate", "learn") and (ans := answers.learned(body.message)):
+        return profile, newly_learned, None, None, ans
     if body.intent == "correct":  # règles sûres d'abord (ur … ara, ɣ/ɛ/ḍ…), sinon le modèle de correction
         direct = spell.reply(body.message)
     else:
@@ -321,21 +324,34 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
     `by_model` : réponse écrite par le modèle (sinon par le serveur : leçon, dictionnaire…)."""
     model = None if off_topic else (tutor.model_for(intent) if by_model else "serveur")
     reply, markers = content.strip_markers(reply)
-    if intent == "learn" and not any(k in ("EXERCICE", "EXERCISE") for k, _ in markers):
+    # Contrôle avant d'afficher : kabyle introuvable dans nos données, ou le modèle dit ne pas savoir
+    # → « je ne sais pas encore » honnête, et la question part en relecture.
+    unverified = [] if off_topic or not by_model else content.unverified_kabyle(reply, system)
+    unknown = by_model and not off_topic and intent not in ("correct", "translate") \
+        and answers.doubtful(reply, unverified)
+    draft = reply
+    if unverified:
+        print(f"[tutor] kabyle non vérifié ({user.id}): {unverified}", flush=True)
+    if unknown:
+        reply, markers = answers.SORRY, []
+    if intent == "learn" and not unknown and not any(k in ("EXERCICE", "EXERCISE") for k, _ in markers):
         markers.append(("EXERCICE", ""))  # « Apprendre » donne toujours un exercice
     if intent in TALK_MODES:  # pas d'exercice dans l'espace « Discuter »
         markers = [(k, v) for k, v in markers if k not in ("EXERCICE", "EXERCISE")]
     blocks = content.build_blocks(reply, markers, seed=f"{user.id}{len(reply)}") if not off_topic else []
-    if not off_topic:
+    if not off_topic and not unknown:
         # 2. Les mots kabyles employés par le prof sont « découverts » aujourd'hui.
         learning.introduce(db, user.id, kb.kabyle_words(reply), "tutor")
     db.add_all([
         ChatMessage(user_id=user.id, role="user", content=message, off_topic=off_topic),
         ChatMessage(user_id=user.id, role="assistant", content=reply, off_topic=off_topic, model=model),
     ])
-    if by_model and not off_topic and reply.strip():
+    if by_model and not off_topic and draft.strip():
         # question libre + réponse du modèle, anonymes, à relire sur /review (entraînement du prof)
-        db.add(QaReview(question=message[:2000], answer=reply[:6000], model=model or ""))
+        db.add(QaReview(question=message[:2000], answer=draft[:6000], model=model or "", unknown=unknown))
+    elif not by_model and not off_topic and answers.server_missing(reply):
+        # le serveur n'a pas trouvé (mot absent de la base…) : la question part aussi en relecture
+        db.add(QaReview(question=message[:2000], answer="", model="serveur", unknown=True))
     if intent not in TALK_MODES and intent != "learn" and user.id not in _SUGGEST \
             and not _ANOTHER.match(message):
         # réponse à une question (hors étape de leçon) : on propose d'y revenir (« oui » relance la leçon)
@@ -344,10 +360,6 @@ def _finish_turn(db: Session, user: User, profile, message: str, reply: str,
     profile.last_session_at = now()
     db.merge(profile)
     db.commit()
-    # Contrôle qualité : kabyle cité par le prof mais absent des références.
-    unverified = [] if off_topic else content.unverified_kabyle(reply, system)
-    if unverified:
-        print(f"[tutor] kabyle non vérifié ({user.id}): {unverified}", flush=True)
     return {
         "unverified": unverified,
         "reply": reply,
@@ -683,9 +695,12 @@ def review_qa(status: str = Query("pending", pattern="^(pending|ok|fixed|rejecte
     stmt = select(QaReview).where(QaReview.status == status)
     if q:
         stmt = stmt.where(QaReview.question.ilike(f"%{q}%") | QaReview.answer.ilike(f"%{q}%"))
-    rows = db.scalars(stmt.order_by(QaReview.created_at.desc()).limit(limit)).all()
-    return [{"id": r.id, "question": r.question, "answer": r.fixed or r.answer, "model": r.model,
-             "status": r.status, "at": r.created_at.isoformat()} for r in rows]
+    # « le prof n'a pas su répondre » d'abord, puis les plus récentes
+    rows = db.scalars(stmt.order_by(QaReview.unknown.desc(), QaReview.created_at.desc()).limit(limit)).all()
+    return [{"id": r.id, "question": r.question, "model": r.model, "status": r.status,
+             "unknown": bool(r.unknown), "draft": r.answer if r.unknown else "",
+             "answer": r.fixed or ("" if r.unknown else r.answer),
+             "at": r.created_at.isoformat()} for r in rows]
 
 
 class QaIn(BaseModel):
@@ -699,11 +714,14 @@ def review_qa_item(qid: str, body: QaIn, db: Session = Depends(get_db)):
     row = db.get(QaReview, qid)
     if not row:
         raise HTTPException(404)
+    if body.status == "fixed" and not (body.answer or "").strip():
+        raise HTTPException(422, "Écris la bonne réponse avant d'enregistrer.")
     row.status = body.status
     row.fixed = (body.answer or "").strip() if body.status == "fixed" else ""
     row.reviewer = body.reviewer
     row.updated_at = now()
     db.commit()
+    answers.invalidate()  # la prochaine fois, le prof donne cette réponse
     return {"ok": True}
 
 

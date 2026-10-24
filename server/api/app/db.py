@@ -111,6 +111,8 @@ class QaReview(Base):
     model: Mapped[str] = mapped_column(String(80), default="")
     status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | ok | fixed | rejected
     fixed: Mapped[str] = mapped_column(Text, default="")
+    # le prof n'a pas su répondre (réponse retenue, l'élève a reçu « je ne sais pas encore »)
+    unknown: Mapped[bool] = mapped_column(default=False)
     reviewer: Mapped[str] = mapped_column(String(80), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -131,6 +133,11 @@ class Review(Base):
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    # petites migrations (colonnes ajoutées après la création des tables)
+    if engine.dialect.name == "postgresql":
+        from sqlalchemy import text  # noqa: PLC0415
+        with engine.begin() as con:
+            con.execute(text("ALTER TABLE qa_reviews ADD COLUMN IF NOT EXISTS unknown BOOLEAN DEFAULT FALSE"))
 
 
 def get_db():

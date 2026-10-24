@@ -1,0 +1,94 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter build web
+
+## exception
+
+FileSystemException: FileSystemException: Failed to decode data using encoding 'utf-8', path = 'C:\Users\Lenovo\OneDrive\Bureau\Minerva\IA\amusnaw\.gitignore'
+
+```
+#0      _File._tryDecode (dart:io/file_impl.dart:704:7)
+#1      _File.readAsStringSync (dart:io/file_impl.dart:715:7)
+#2      _File.readAsLinesSync (dart:io/file_impl.dart:721:36)
+#3      ForwardingFile.readAsLinesSync (package:file/src/forwarding/forwarding_file.dart:107:16)
+#4      ErrorHandlingFile.readAsLinesSync.<anonymous closure> (package:flutter_tools/src/base/error_handling_io.dart:591:22)
+#5      _runSync (package:flutter_tools/src/base/error_handling_io.dart:1116:16)
+#6      ErrorHandlingFile.readAsLinesSync (package:flutter_tools/src/base/error_handling_io.dart:590:12)
+#7      ProjectMigrator.processFileLines (package:flutter_tools/src/base/project_migrator.dart:40:37)
+#8      ScrubGeneratedPluginRegistrant.migrate (package:flutter_tools/src/web/migrations/scrub_generated_plugin_registrant.dart:28:7)
+#9      ProjectMigration.run (package:flutter_tools/src/base/project_migrator.dart:86:22)
+#10     WebBuilder.buildWeb (package:flutter_tools/src/web/compile.dart:102:21)
+<asynchronous suspension>
+#11     BuildWebCommand.runCommand (package:flutter_tools/src/commands/build_web.dart:293:5)
+<asynchronous suspension>
+#12     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1630:27)
+<asynchronous suspension>
+#13     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#14     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
+<asynchronous suspension>
+#15     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:496:9)
+<asynchronous suspension>
+#16     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#17     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:431:5)
+<asynchronous suspension>
+#18     FlutterCommandRunner.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:307:33)
+<asynchronous suspension>
+#19     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:104:11)
+<asynchronous suspension>
+#20     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#21     main (package:flutter_tools/executable.dart:103:3)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[32m[✓][39m Flutter (Channel stable, 3.44.8, on Microsoft Windows [Version 10.0.26300.9711], locale fr-CA) [847ms]
+    [32m•[39m Flutter version 3.44.8 on channel stable at C:\Users\Lenovo\OneDrive\Bureau\flutter
+    [32m•[39m Upstream repository https://github.com/flutter/flutter.git
+    [32m•[39m Framework revision 058e0af2c2 (3 months ago), 2026-07-23 10:56:21 -0700
+    [32m•[39m Engine revision 0cd610717b
+    [32m•[39m Dart version 3.12.2
+    [32m•[39m DevTools version 2.57.0
+    [32m•[39m Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop, enable-android,
+      enable-ios, cli-animations, enable-native-assets, enable-swift-package-manager, omit-legacy-version-file,
+      enable-lldb-debugging, enable-uiscene-migration
+
+[32m[✓][39m Windows Version (Windows 11 or higher, 26H2, 2009) [2,0s]
+
+[33m[!][39m Android toolchain - develop for Android devices (Android SDK version 37.0.0) [1 056ms]
+    [32m•[39m Android SDK at C:\Users\Lenovo\AppData\Local\Android\sdk
+    [32m•[39m Emulator version 37.1.11.0 (build_id 15917651) (CL:N/A)
+    [32m•[39m Platform android-37.0, build-tools 37.0.0
+    [32m•[39m Java binary at: C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot\bin\java
+      This JDK is specified in your Flutter configuration.
+      To change the current JDK, run: `flutter config --jdk-dir="path/to/jdk"`.
+    [32m•[39m Java version OpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)
+    [31m✗[39m Android license status unknown.
+      Run `flutter doctor --android-licenses` to accept the SDK licenses.
+      See https://flutter.dev/to/windows-android-setup for more details.
+
+[32m[✓][39m Chrome - develop for the web [252ms]
+    [32m•[39m Chrome at C:\Program Files\Google\Chrome\Application\chrome.exe
+
+[32m[✓][39m Visual Studio - develop Windows apps (Visual Studio Community 2026 18.10.3) [248ms]
+    [32m•[39m Visual Studio at C:\Program Files\Microsoft Visual Studio\18\Community
+    [32m•[39m Visual Studio Community 2026 version 18.10.12224.181
+    [32m•[39m Windows 10 SDK version 10.0.26100.0
+
+[32m[✓][39m Connected device (3 available) [391ms]
+    [32m•[39m Windows (desktop) • windows • windows-x64    • Microsoft Windows [Version 10.0.26300.9711]
+    [32m•[39m Chrome (web)      • chrome  • web-javascript • Google Chrome 155.0.8059.85
+    [32m•[39m Edge (web)        • edge    • web-javascript • Microsoft Edge 155.0.4283.45
+
+[32m[✓][39m Network resources [945ms]
+    [32m•[39m All expected network resources are available.
+
+[33m![39m Doctor found issues in 1 category.
+```

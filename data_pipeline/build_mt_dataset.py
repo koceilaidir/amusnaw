@@ -12,7 +12,8 @@ Produit dans ../data/mt :
 
 Règles :
 - Seulement du kabyle écrit par des humains (jamais de kabyle produit par une machine).
-- Le livre de Bouamara (licence CC BY-NC-ND) est exclu : sa licence interdit l'entraînement.
+- Le livre de Bouamara « Apprendre le kabyle par niveaux » est inclus : autorisation obtenue par le HCA
+  (octobre 2026) pour améliorer l'IA d'Amusnaw (voir data/README.md).
 - Les phrases du banc d'essai sont retirées partout, sinon le score serait truqué.
 """
 import gzip
@@ -134,6 +135,18 @@ def main(data: Path, out: Path):
         add(r.get("fr"), r.get("kab"), "contes")
     for r in jsonl(data / "tinfaliyin.jsonl"):
         add(r.get("fr"), r.get("kab"), "expressions")
+    # Assimil, Kabyle de poche : phrases et dialogues du quotidien (autorisation via le HCA)
+    for r in jsonl(data / "assimil_poche.jsonl"):
+        for fr in re.split(r"\s*/\s*", r.get("fr") or "")[:1]:
+            add(re.sub(r"\s*\([^)]*\)", "", fr), re.split(r"\s*/\s*", r.get("kab") or "")[0], "assimil",
+                words=r.get("kind") == "word")
+    # J.-M. Dallet, Dictionnaire français-kabyle : seulement les entrées dont le kabyle est retrouvé tel quel
+    for r in jsonl(data / "dallet_fk.jsonl"):
+        if r.get("confident") and len(r.get("forms", [])) == 1 and len(r["fr"].split()) <= 4:
+            add(re.sub(r"\s*\([^)]*\)", "", r["fr"]), r["forms"][0], "dallet", words=True)
+    # K. Bouamara, Apprendre le kabyle par niveaux : phrases vérifiées par l'auteur (autorisation via le HCA)
+    for r in jsonl(data / "bouamara_niveaux.jsonl"):
+        add(r.get("fr"), r.get("kab"), "bouamara", words=r.get("kind") == "word")
     # Mots du dictionnaire : premier sens seulement, entrées courtes (vocabulaire)
     for name in ("lexicon_tatrart", "lexicon_terre_animaux", "lexicon_corps_humain", "lexicon_glossaires_livres",
                  "lexicon_tinfaliyin", "glossaries", "lexicon_didactique", "lexicon"):

@@ -34,6 +34,8 @@ from app import conjugation, content, guide, tutor  # noqa: E402
 from app.knowledge import fold, kb  # noqa: E402
 
 rng = random.Random(2026)
+# v2 : le vrai prompt du serveur dans une plus grande part des exemples (la v1 se croyait toujours en leçon)
+SERVER_PROMPT_SHARE = 0.15
 MT = ROOT / "data" / "mt"
 OUT = ROOT / "data" / "chat"
 
@@ -58,7 +60,7 @@ def server_prompt(unit=None) -> str:
 
 def convo(user: str, assistant: str, kind: str, refs: bool = True) -> dict:
     """Une question, une réponse. 6 % des exemples avec le vrai prompt du serveur (long) et les références."""
-    if rng.random() < 0.06:
+    if rng.random() < SERVER_PROMPT_SHARE:
         r = kb.references_for(user) if refs else ""
         u = f"{user}\n\n---\nRÉFÉRENCES VALIDÉES pour cette réponse (ta seule source de kabyle) :\n{r}" if r else user
         msgs = [{"role": "system", "content": server_prompt()}, {"role": "user", "content": u}]
@@ -248,6 +250,93 @@ def lessons(n_learners=40):
     return out
 
 
+# ---------- 7. Vraies discussions (v2) ----------
+# Phrases et petits dialogues d'Assimil (Kabyle de poche) : le prof répond en kabyle simple, traduit,
+# et relance la discussion. Plus aucune réponse passe-partout.
+FOLLOW = ["Et toi, comment ça va aujourd'hui ?", "Tu veux que je t'apprenne la réponse ?",
+          "Tu veux continuer la discussion en kabyle ?", "À toi : réponds-moi en kabyle si tu peux.",
+          "Tu veux une autre formule du même genre ?"]
+
+
+def assimil_rows():
+    p = Path(os.environ["DATA_DIR"]) / "assimil_poche.jsonl"
+    return list(jsonl(p)) if p.exists() else []
+
+
+def conversation(rows):
+    out = []
+    sent = [r for r in rows if r["kind"] == "sentence"]
+    dialogues = defaultdict(list)
+    for r in rows:
+        if r.get("dialogue"):
+            dialogues[r["dialogue"]].append(r)
+    # a) l'élève dit une phrase kabyle : le prof comprend, traduit, et répond en kabyle seulement
+    #    quand la suite est connue (ligne suivante du dialogue) ; sinon il relance en français.
+    nxt = {}
+    for rs in dialogues.values():
+        for x, y in zip(rs, rs[1:]):
+            nxt[x["kab"]] = y
+    def pair(r):  # « A / B » des deux côtés → première formule ; sinon la phrase entière
+        k, f = r["kab"], r["fr"]
+        ks, fs = re.split(r"\s+/\s+", k), re.split(r"\s+/\s+", f)
+        if len(ks) > 1 and len(ks) == len(fs):
+            k, f = ks[0], fs[0]
+        f = f.rstrip(".")
+        return k, (f if re.search(r"[?!…)]$", f) else f + ".")
+
+    def first(k):
+        return re.split(r"\s+/\s+", k)[0] if len(re.split(r"\s+/\s+", k)[0].split()) > 1 else k
+    for r in sent:
+        k, f = pair(r)
+        for _ in range(2):
+            y = nxt.get(r["kab"])
+            if y:
+                a = rng.choice([
+                    "« {k} » : {f} Je te réponds : **{rk}** — {rf}",
+                    "**{rk}** ({rf})\n\nTu as bien dit : « {k} » — {f}",
+                ]).format(k=k, f=f, rk=pair(y)[0], rf=pair(y)[1])
+            else:
+                a = rng.choice([
+                    "« {k} » veut dire : {f} {fo}",
+                    "Bien écrit ! « {k} », c'est : {f} {fo}",
+                ]).format(k=k, f=f, fo=rng.choice(FOLLOW))
+            out.append(convo(k, a, "discussion"))
+    # b) dialogues suivis, tour par tour (l'élève joue un rôle, le prof l'autre)
+    for d, rs in dialogues.items():
+        for _ in range(12):
+            msgs = [{"role": "system", "content": server_prompt() if rng.random() < SERVER_PROMPT_SHARE else SYSTEM}]
+            msgs.append({"role": "user", "content": "On fait un petit dialogue en kabyle ?"})
+            msgs.append({"role": "assistant", "content": f"Avec plaisir ! Je commence : **{rs[0]['kab']}** — {rs[0]['fr']}"})
+            for i in range(1, len(rs) - 1, 2):
+                msgs.append({"role": "user", "content": rs[i]["kab"]})
+                msgs.append({"role": "assistant", "content": f"Très bien ! ({rs[i]['fr']})\n\n**{rs[i + 1]['kab']}** — {rs[i + 1]['fr']}"})
+            if len(msgs) > 3:
+                out.append({"messages": msgs, "kind": "dialogue"})
+    # c) « comment dit-on… » sur les phrases du quotidien
+    for r in rows:
+        q = rng.choice(["Comment on dit « {f} » en kabyle ?", "Comment dire « {f} » ?", "En kabyle, « {f} » ?"])
+        out.append(convo(q.format(f=r["fr"].rstrip(".")), f"On dit : **{r['kab']}**", "discussion"))
+    return out
+
+
+# ---------- 8. « Je ne sais pas » (v2) ----------
+UNKNOWN_Q = ["Comment on dit « {w} » en kabyle ?", "Que veut dire « {w} » ?", "Traduis « {w} » en kabyle",
+             "Qui a inventé « {w} » en Kabylie ?", "En quelle année est né le premier {w} kabyle ?"]
+SORRY = ("Désolé, je ne connais pas encore la réponse, et je préfère ne pas l'inventer. J'ai noté ta question : "
+         "un kabylophone va la vérifier, et je saurai te répondre la prochaine fois.")
+
+
+def dont_know(n=1500):
+    """Le prof dit qu'il ne sait pas quand rien dans les références ne permet de répondre."""
+    fake = ["ordinateur quantique", "trottinette électrique", "photosynthèse", "blockchain", "satellite géostationnaire",
+            "microprocesseur", "algorithme", "hélicoptère", "imprimante 3D", "vaccin à ARN", "réseau neuronal",
+            "panneau solaire", "sous-marin nucléaire", "téléphérique", "cryptographie"]
+    out = []
+    for _ in range(n):
+        out.append(convo(rng.choice(UNKNOWN_Q).format(w=rng.choice(fake)), SORRY, "je ne sais pas", refs=False))
+    return out
+
+
 # ---------- 6. Grammaire, culture, hors sujet ----------
 def notes_and_culture():
     out = []
@@ -278,9 +367,12 @@ def main():
     rng.shuffle(others)
 
     data = []
-    data += translation(others[:50_000])
+    data += translation(others[:35_000])
     data += vocabulary(words, sentences)
-    data += correction(others[50_000:], 25_000)
+    data += correction(others[35_000:], 15_000)
+    assimil = assimil_rows()
+    data += conversation(assimil)
+    data += dont_know(1500)
     data += conjugaison(1500)
     data += lessons(400)
     data += notes_and_culture()
@@ -313,11 +405,11 @@ def main():
     stats = {"train": len(train), "dev": len(dev), "types": kinds, "cpt_phrases": min(len(mono), 250_000),
              "eval_traduction": len(evals), "eval_correction": len(ec)}
     json.dump(stats, (OUT / "stats.json").open("w"), ensure_ascii=False, indent=1)
-    with zipfile.ZipFile(OUT / "amusnaw-v1-data.zip", "w", zipfile.ZIP_DEFLATED) as z:
+    with zipfile.ZipFile(OUT / "amusnaw-v2-data.zip", "w", zipfile.ZIP_DEFLATED) as z:
         for n in ("sft_train.jsonl", "sft_dev.jsonl", "cpt_kab.txt", "eval_translate.jsonl", "eval_correct.jsonl",
                   "stats.json"):
             z.write(OUT / n, n)
-    print(f"Prêt : {OUT / 'amusnaw-v1-data.zip'}  ({stats})")
+    print(f"Prêt : {OUT / 'amusnaw-v2-data.zip'}  ({stats})")
 
 
 if __name__ == "__main__":
