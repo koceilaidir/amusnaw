@@ -65,6 +65,19 @@ NLLB réentraîné sur Kaggle (1 h d'entraînement) avec 240 000 paires humaines
 
 Pistes pour une v2 : rétro-traduire les 869 000 phrases (au lieu de 300 000), deux passages sur les données (l'entraînement n'a pris qu'une heure sur les 6 h 30 possibles).
 
+## amusnaw-mt v2 en ligne (25 octobre 2026)
+
+600 000 phrases rétro-traduites, deux passages, nouvelles données (Assimil, Bouamara, Dallet). Mesuré sur le VPS :
+
+| Sens | amusnaw-mt v1 | **amusnaw-mt v2** |
+|---|---|---|
+| français → kabyle, quotidien | 46,3 | **48,4** |
+| français → kabyle, livres | 35,3 | **38,2** |
+| kabyle → français, quotidien | 55,6 | **59,8** |
+| kabyle → français, livres | 38,9 | **40,5** |
+
+L'ancienne version reste dans `models/amusnaw-mt-v1` (retour arrière possible). amusnaw-v2 (le prof) n'a pas été installé : moins bon que la v1 en correction (53 % contre 60 %), voir docs/AMUSNAW_V2.md.
+
 ## Étape 2 : entraîner amusnaw-mt (gratuit, sur Kaggle)
 
 ### 1. Fabriquer les données (sur le PC)

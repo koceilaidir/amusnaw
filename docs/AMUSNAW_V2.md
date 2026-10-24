@@ -30,3 +30,8 @@
 3. Importer `training/amusnaw_mt_kaggle.ipynb` et `training/amusnaw_v2_kaggle.ipynb` (deux carnets, deux séances : on peut les lancer le même jour).
 4. Pour chaque carnet : GPU T4 x2, Internet On, Add Input le bon jeu de données, puis **Save & Run All (Commit)**.
 5. Installer seulement si le rapport (`rapport.json`, `rapport_v2.json`) est meilleur. Même procédure qu'en v1 (docs/TRADUCTION.md, docs/AMUSNAW_V1.md), en remplaçant v1 par v2.
+
+## Résultats (24 octobre 2026)
+
+- **amusnaw-mt v2 : installé** (voir docs/TRADUCTION.md), meilleur que la v1 sur les quatre tests.
+- **amusnaw-v2 : non installé.** Entraînement complet (502/502 pas), mais traduction 27,1 / 38,3 (v1 : 32,5 / 44,4) et correction parfaite 53 % (v1 : 60 %). Il ne répond plus « On continue ? » et dit « je ne sais pas », mais il répond en français aux salutations kabyles et a inventé « Yennayer le 12 février ». Leçon : un modèle de 3 milliards de paramètres perd en traduction et en correction quand on ajoute de la discussion générée. La discussion reste confiée à Qwen encadré par le serveur ; une v3 attendra de vraies conversations relues (/review).
