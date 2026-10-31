@@ -1,3 +1,4 @@
+# Adresse principale du site (dans .env : API_DOMAIN=amusnaw.cc)
 {$API_DOMAIN} {
 	encode gzip
 
@@ -15,4 +16,9 @@
 		@html path / /index.html
 		header @html Cache-Control "no-cache"
 	}
+}
+
+# Anciennes adresses et www → adresse principale (308 : garde les POST de l'API)
+{$OLD_DOMAINS:www.localhost} {
+	redir https://{$API_DOMAIN}{uri} 308
 }

@@ -67,6 +67,7 @@ services:
       - "443:443"
     environment:
       API_DOMAIN: ${API_DOMAIN}
+      OLD_DOMAINS: ${OLD_DOMAINS:-www.localhost}   # ex. « www.amusnaw.cc, 5-39-119-109.sslip.io »
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./web:/srv/web:ro   # site web : copie de build/web (flutter build web)
