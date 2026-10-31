@@ -122,3 +122,17 @@ Autorisation des auteurs / éditeurs obtenue par le HCA (octobre 2026), **pour a
 | `dallet_fk.jsonl` | J.-M. Dallet, *Dictionnaire français-kabyle*, SELAF, 1985 | couche de texte OCR ancienne ; formes kabyles restaurées à partir du kabyle attesté (`parse_dallet_fk.py`, `kab_vocab.py`) ; `confident=true` pour ~19 % des entrées | entrées sûres → paires de mots ; le reste attend une relecture |
 | `externes/ocr/naitzerrad_*.txt` | K. Naït-Zerrad, *Manuel de conjugaison kabyle* | OCR (tesseract) ; ɣ/ɛ souvent abîmés | pas encore utilisé : servira à vérifier et étendre nos conjugaisons |
 | `externes/ocr/mammeri_*.txt`, `mammeri_tajerrumt.jsonl` | M. Mammeri, *Tajerrumt n tmaziɣt*, Maspero, 1976 | OCR de qualité insuffisante (185 phrases sûres seulement) | pas utilisé pour l'entraînement |
+
+
+### Lexiques reçus le 28 octobre 2026 (`import_lexiques_2026.py`)
+
+| Fichier | Source | Entrées | Usage |
+|---|---|---|---|
+| `lexicon_maladies.jsonl` | *Amawal n waṭṭanen*, vocabulaire kabyle des maladies, 2012 | 2 071 | dictionnaire du prof, paires de traduction |
+| `lexicon_osteologie.jsonl` | *Iɣsan s teqbaylit*, vocabulaire kabyle de l'ostéologie et de l'orthopédie, 2010 | 2 343 | dictionnaire du prof, paires de traduction |
+| `lexicon_informatique.jsonl` | *Amawal n tsenselkimt*, lexique informatique | 1 381 | dictionnaire du prof (néologismes, signalés comme tels) |
+| `lexicon_electrotechnique.jsonl` | *Dictionnaire d'électrotechnique français-tamazight*, 2011 | 659 | idem (néologismes) |
+| `lexicon_linguistique.jsonl` | *Amawal n tesnilest* (terminologie linguistique) | 1 284 | idem (néologismes) |
+| `lexicon_fr_berbere.jsonl` | *Dictionnaire français-berbère* (.docx, synonymes de plusieurs parlers) | 2 309 | seulement les mots retrouvés dans le kabyle attesté |
+
+Non intégrés : *Amawal n tmaziɣt tatrart* (1990, PDF scanné sans texte ; l'édition 2004 est déjà dans `lexicon_tatrart.jsonl`), *Amawal n teqbaylit n tfekka n wemdan* (2003, déjà dans `lexicon_corps_humain.jsonl`), *Amawal Taqbaylit-Tumẓabt* (classement par racines, surtout du mozabite).

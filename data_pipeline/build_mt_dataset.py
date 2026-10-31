@@ -149,7 +149,8 @@ def main(data: Path, out: Path):
         add(r.get("fr"), r.get("kab"), "bouamara", words=r.get("kind") == "word")
     # Mots du dictionnaire : premier sens seulement, entrées courtes (vocabulaire)
     for name in ("lexicon_tatrart", "lexicon_terre_animaux", "lexicon_corps_humain", "lexicon_glossaires_livres",
-                 "lexicon_tinfaliyin", "glossaries", "lexicon_didactique", "lexicon"):
+                 "lexicon_tinfaliyin", "glossaries", "lexicon_didactique", "lexicon",
+                 "lexicon_maladies", "lexicon_osteologie"):  # vocabulaire de la santé (kabyle attesté)
         for r in jsonl(data / f"{name}.jsonl"):
             fr = re.split(r"[;,(]", r.get("fr") or "")[0].strip()
             kab = (r.get("kab") or "").strip()
