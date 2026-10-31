@@ -918,14 +918,15 @@ class _Composer extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: p.surface,
             borderRadius: BorderRadius.circular(26),
             border: Border.all(color: p.separator, width: .5),
             boxShadow: p.shadowLg,
           ),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          // photo, texte et bouton d'envoi alignés au centre
+          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             if (onPhoto != null)
               Tooltip(
                 message: 'Envoyer une photo : je te dis les objets en kabyle',
@@ -938,7 +939,7 @@ class _Composer extends StatelessWidget {
               ),
             Expanded(
               child: Padding(
-                padding: EdgeInsets.only(left: onPhoto != null ? 4 : 10, bottom: 2),
+                padding: EdgeInsets.only(left: onPhoto != null ? 4 : 10),
                 child: TextField(
                   controller: controller,
                   focusNode: focusNode,
@@ -953,7 +954,8 @@ class _Composer extends StatelessWidget {
                     isDense: true,
                     border: InputBorder.none,
                     hintText: hint,
-                    hintStyle: TextStyle(color: p.text2, fontSize: 16),
+                    hintMaxLines: 1, // texte d'aide sur une ligne, terminé par « … » si trop long
+                    hintStyle: TextStyle(color: p.text2, fontSize: 16, overflow: TextOverflow.ellipsis),
                     contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   ),
                 ),
