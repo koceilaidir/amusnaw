@@ -103,7 +103,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   void _toast(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showInfo(context, 'Connexion impossible', msg); // fenêtre du site, pas de bandeau en bas
   }
 
   bool get _testMode => kDebugMode || kIsWeb || AppConfig.testLogin;

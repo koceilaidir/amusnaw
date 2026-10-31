@@ -121,8 +121,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     if (!ok || !mounted) return;
     setState(() => _guest = false);
     _syncProgress();
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ton compte est prêt : ta progression et tes discussions sont gardées.')));
+    await showInfo(context, 'Ton compte est prêt', 'Ta progression et tes discussions sont gardées.');
   }
 
   void _toggleMenu() {
@@ -733,28 +732,52 @@ extension on Widget {
       );
 }
 
-/// Petit bouton « Copier » sous un message.
-class _CopyButton extends StatelessWidget {
+/// Petit bouton « Copier » sous un message : l'icône devient une coche un instant
+/// (pas de bandeau en bas de l'écran).
+class _CopyButton extends StatefulWidget {
   const _CopyButton(this.text);
   final String text;
+
+  @override
+  State<_CopyButton> createState() => _CopyButtonState();
+}
+
+class _CopyButtonState extends State<_CopyButton> {
+  bool _copied = false;
+  Timer? _reset;
+
+  @override
+  void dispose() {
+    _reset?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = AppPalette.of(context);
     return Semantics(
-      label: 'Copier',
+      label: _copied ? 'Copié' : 'Copier',
       button: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () {
-          Clipboard.setData(ClipboardData(text: text.replaceAll('**', '')));
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(const SnackBar(content: Text('Copié'), duration: Duration(seconds: 1)));
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: Icon(CupertinoIcons.doc_on_doc, size: 16, color: p.text2),
+      child: Tooltip(
+        message: _copied ? 'Copié' : 'Copier',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: widget.text.replaceAll('**', '')));
+            setState(() => _copied = true);
+            _reset?.cancel();
+            _reset = Timer(const Duration(milliseconds: 1500), () {
+              if (mounted) setState(() => _copied = false);
+            });
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 150),
+              child: Icon(_copied ? CupertinoIcons.checkmark_alt : CupertinoIcons.doc_on_doc,
+                  key: ValueKey(_copied), size: 16, color: _copied ? p.green : p.text2),
+            ),
+          ),
         ),
       ),
     );
