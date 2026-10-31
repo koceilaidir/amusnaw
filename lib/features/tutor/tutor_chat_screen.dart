@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show Uint8List, kIsWeb;
+import 'package:flutter/foundation.dart' show Uint8List, debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -188,15 +188,26 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       if (s == null) return;
       source = s;
     }
+    Uint8List bytes;
     try {
-      final file = await ImagePicker().pickImage(source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
+      // Navigateur : pas de redimensionnement ici (il échoue sur certains formats) ;
+      // le serveur réduit la photo de toute façon.
+      final file = kIsWeb
+          ? await ImagePicker().pickImage(source: source)
+          : await ImagePicker().pickImage(source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
       if (file == null || !mounted) return;
-      final bytes = await file.readAsBytes();
-      if (!mounted) return;
-      await _send(_input.text, image: bytes);
-    } catch (_) {
+      bytes = await file.readAsBytes();
+    } catch (e) {
+      debugPrint('[photo] $e');
       if (mounted) await showInfo(context, 'Photo indisponible', 'Je n’ai pas pu ouvrir cette photo. Réessaie avec une autre.');
+      return;
     }
+    if (!mounted) return;
+    if (bytes.length > 8 * 1024 * 1024) {
+      await showInfo(context, 'Photo trop lourde', 'Choisis une photo de moins de 8 Mo.');
+      return;
+    }
+    await _send(_input.text, image: bytes);
   }
 
   Future<void> _send(String raw, {String? intent, Uint8List? image}) async {
