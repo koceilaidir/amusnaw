@@ -1,3 +1,4 @@
+import base64
 import json
 import random
 import re
@@ -20,7 +21,7 @@ from .limits import chat_limit, signup_limit
 from .db import (ChatMessage, LearnedWord, LearnerProfile, QaReview, Review, SavedConversation, SessionLocal, User,
                  get_db, init_db, now)
 from .knowledge import fold, kb
-from . import answers, content, email_login, flavor, guide, learning, router, spell, translate
+from . import answers, content, email_login, flavor, guide, learning, router, spell, translate, vision
 
 
 _BACKGROUND: set = set()  # tâches de fond gardées en vie
@@ -186,6 +187,8 @@ class ChatIn(BaseModel):
     tz_offset_minutes: int = Field(0, ge=-840, le=840)
     # Choix fait sur l'écran d'accueil : "learn" (apprendre) ou "talk" (discuter).
     intent: str | None = Field(None, max_length=16)
+    # Photo envoyée au prof (JPEG/PNG en base64) : il dit les objets en kabyle. Jamais enregistrée.
+    image: str | None = Field(None, max_length=12_000_000)
 
 
 # Espace « Discuter » : conversation libre, traduction, correction (pas de leçon).
@@ -236,6 +239,30 @@ async def _translation(body: "ChatIn", user: User, db: Session) -> str | None:
         return ("Je ne peux pas encore traduire un texte aussi long de façon fiable. "
                 "Envoie-le-moi phrase par phrase, ou demande-moi le sens d'un mot précis.")
     return out
+
+
+async def _photo(body: "ChatIn", db: Session) -> str:
+    """Photo → noms des objets (modèle de vision) → mots kabyles vérifiés (voir vision.py)."""
+    if not get_settings().vision_model:
+        return "La reconnaissance de photos n'est pas encore activée sur ce serveur."
+    try:
+        raw = base64.b64decode(re.sub(r"^data:[^,]*,", "", body.image or ""), validate=False)
+        jpeg = vision.shrink(raw)
+    except ValueError:
+        return "Je n'arrive pas à ouvrir cette image. Envoie une photo au format JPEG ou PNG."
+    finally:
+        body.image = None  # la photo n'est gardée nulle part
+    try:
+        names = await vision.objects(jpeg)
+    except Exception as e:  # noqa: BLE001 — modèle absent ou trop lent
+        print(f"[vision] échec : {type(e).__name__}: {e}", flush=True)
+        return ("Je n'ai pas réussi à regarder ta photo cette fois-ci (je suis très demandé). "
+                "Réessaie dans un instant.")
+    text, missing = vision.reply(names, seed=body.message)
+    for m in missing:  # objet reconnu sans mot kabyle vérifié : en relecture
+        db.add(QaReview(question=f"Photo : comment dit-on « {m} » en kabyle ?", answer="", model="vision",
+                        unknown=True))
+    return text
 
 
 def _prepare_turn(body: "ChatIn", user: User, db: Session, ready: str | None = None):
@@ -426,7 +453,7 @@ def _trim_unfinished(text: str) -> str:
 @app.post("/tutor/chat")
 async def chat(body: ChatIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     chat_limit.check(str(user.id))
-    ready = await _translation(body, user, db)
+    ready = await _photo(body, db) if body.image else await _translation(body, user, db)
     profile, newly, system, history, direct = _prepare_turn(body, user, db, ready)
     db.commit()  # rien de verrouillé pendant que le modèle écrit (sinon blocage si l'élève renvoie)
     if direct:
@@ -451,12 +478,24 @@ async def chat_stream(body: ChatIn, user: User = Depends(current_user), db: Sess
       data: {"type": "done", "reply": …, "off_topic": …, "learned": {…}}
       data: {"type": "error", "message": …}
     """
+    def event(obj: dict) -> str:
+        return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
+
+    if body.image:  # photo : le modèle de vision peut prendre une minute, la connexion s'ouvre d'abord
+        async def photo_gen():
+            yield ": le prof regarde la photo\n\n"
+            ready = await _photo(body, db)
+            profile, newly, _, _, direct = _prepare_turn(body, user, db, ready)
+            shown, _ = content.strip_markers(direct)
+            yield event({"type": "delta", "text": shown})
+            yield event({"type": "done", **_finish_turn(db, user, profile, body.message, direct, False, newly,
+                                                         body.intent, direct, by_model=False)})
+        return StreamingResponse(photo_gen(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
     ready = await _translation(body, user, db)
     profile, newly, system, history, direct = _prepare_turn(body, user, db, ready)
     db.commit()  # rien de verrouillé pendant que le modèle écrit (sinon blocage si l'élève renvoie)
-
-    def event(obj: dict) -> str:
-        return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
 
     async def gen():
         nonlocal direct

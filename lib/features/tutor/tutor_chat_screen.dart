@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show Uint8List, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../content/sample_content.dart';
@@ -171,15 +174,41 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     _dropFocus();
   }
 
-  Future<void> _send(String raw, {String? intent}) async {
-    final text = raw.trim();
+  /// Photo : le prof dit en kabyle les objets qu'il reconnaît (mots vérifiés du serveur).
+  Future<void> _pickPhoto() async {
+    if (_sending) return;
+    _dropFocus();
+    var source = ImageSource.gallery;
+    if (!kIsWeb) {
+      // le navigateur propose lui-même « appareil photo » ou « fichiers »
+      final s = await showChoice<ImageSource>(context, 'Montre-moi une photo', {
+        ImageSource.camera: 'Prendre une photo',
+        ImageSource.gallery: 'Choisir dans mes photos',
+      });
+      if (s == null) return;
+      source = s;
+    }
+    try {
+      final file = await ImagePicker().pickImage(source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
+      if (file == null || !mounted) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      await _send(_input.text, image: bytes);
+    } catch (_) {
+      if (mounted) await showInfo(context, 'Photo indisponible', 'Je n’ai pas pu ouvrir cette photo. Réessaie avec une autre.');
+    }
+  }
+
+  Future<void> _send(String raw, {String? intent, Uint8List? image}) async {
+    var text = raw.trim();
+    if (image != null && text.isEmpty) text = 'Qu’est-ce que c’est en kabyle ?';
     if (text.isEmpty || _sending) return;
     _input.clear();
     FocusScope.of(context).unfocus();
     final conv = _conv;
     if (conv.title.isEmpty) conv.title = text.length > 40 ? '${text.substring(0, 40)}…' : text;
     setState(() {
-      conv.messages.add(ChatMsg(text, fromTutor: false));
+      conv.messages.add(ChatMsg(image != null ? '📷 $text' : text, fromTutor: false, image: image));
       _sending = true;
       _suggestions = const [];
     });
@@ -228,6 +257,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         'message': text,
         'tz_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
         if (intent != null) 'intent': intent,
+        if (image != null) 'image': base64Encode(image),
       }).timeout(
         // 2 minutes sans un mot du prof : on arrête d'attendre et on le dit
         const Duration(seconds: 120),
@@ -503,6 +533,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                 topics: empty ? _topics : _suggestions,
                 onSend: () => _send(_input.text),
                 onTopic: (t) => _send(t),
+                onPhoto: _pickPhoto,
                 focusNode: _inputFocus,
                 hint: empty ? 'Pose une question, ou écris en kabyle…' : 'Écris ta réponse, ou pose une question…',
                 note: 'L’IA peut se tromper : vérifie les phrases importantes.',
@@ -774,7 +805,20 @@ class _Message extends StatelessWidget {
               bottomRight: Radius.circular(6),
             ),
           ),
-          child: Text(m.text, style: TextStyle(fontSize: 16, height: 1.4, color: p.text)),
+          child: m.image == null
+              ? Text(m.text, style: TextStyle(fontSize: 16, height: 1.4, color: p.text))
+              : Column(crossAxisAlignment: CrossAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 240, maxHeight: 240),
+                      child: Image.memory(m.image!, fit: BoxFit.cover, gaplessPlayback: true),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(m.text.replaceFirst('📷 ', ''),
+                      style: TextStyle(fontSize: 16, height: 1.4, color: p.text)),
+                ]),
         ),
       ).withCopy(m.text, right: true);
     }
@@ -841,6 +885,7 @@ class _Composer extends StatelessWidget {
     required this.onSend,
     required this.onTopic,
     required this.focusNode,
+    this.onPhoto,
     this.hint = 'Écris ton message…',
     this.note,
   });
@@ -852,6 +897,7 @@ class _Composer extends StatelessWidget {
   final List<String> topics;
   final VoidCallback onSend;
   final ValueChanged<String> onTopic;
+  final VoidCallback? onPhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -869,9 +915,19 @@ class _Composer extends StatelessWidget {
             boxShadow: p.shadowLg,
           ),
           child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            if (onPhoto != null)
+              Tooltip(
+                message: 'Envoyer une photo : je te dis les objets en kabyle',
+                child: _Circle(
+                  label: 'Envoyer une photo',
+                  color: Colors.transparent,
+                  onTap: sending ? null : onPhoto,
+                  child: Icon(CupertinoIcons.camera, size: 21, color: sending ? p.separator : p.text2),
+                ),
+              ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.only(left: 10, bottom: 2),
+                padding: EdgeInsets.only(left: onPhoto != null ? 4 : 10, bottom: 2),
                 child: TextField(
                   controller: controller,
                   focusNode: focusNode,

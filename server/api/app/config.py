@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     mail_from_name: str = "Amusnaw"
     # Moteur de traduction NLLB (service « mt » de docker-compose). Vide = désactivé.
     mt_url: str = "http://mt:8100"
+    # Reconnaissance de photos (modèle de vision dans Ollama). Vide = désactivée.
+    vision_model: str = "qwen2.5vl:3b"
+    vision_timeout: int = 100      # secondes (processeur sans carte graphique)
+    vision_keep_alive: str = "5m"  # libère la mémoire après 5 min sans photo
 
     @property
     def google_audiences(self) -> list[str]:

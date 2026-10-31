@@ -8,7 +8,12 @@ import '../api/api_client.dart';
 /// Un message affiché dans le chat.
 class ChatMsg {
   ChatMsg(this.text,
-      {required this.fromTutor, this.offTopic = false, this.failed = false, this.celebration = false, this.block});
+      {required this.fromTutor,
+      this.offTopic = false,
+      this.failed = false,
+      this.celebration = false,
+      this.block,
+      this.image});
 
   /// Modifiable : la réponse du prof s'écrit au fur et à mesure (streaming).
   String text;
@@ -21,6 +26,9 @@ class ChatMsg {
 
   /// Carte construite par le serveur (word, exercise, capsule).
   final Map<String, dynamic>? block;
+
+  /// Photo envoyée au prof : affichée pendant la séance, jamais enregistrée.
+  final Uint8List? image;
 
   Map<String, dynamic> toJson() => {
         't': text,

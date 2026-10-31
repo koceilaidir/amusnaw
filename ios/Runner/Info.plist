@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Amusnaw utilise l'appareil photo pour te dire en kabyle le nom des objets que tu photographies.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Amusnaw ouvre la photo que tu choisis pour te dire en kabyle le nom des objets.</string>
 </dict>
 </plist>
