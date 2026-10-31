@@ -6,7 +6,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show Uint8List, debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../content/sample_content.dart';
@@ -19,6 +18,7 @@ import '../../core/content/content_repository.dart';
 import '../../core/learning/learner_store.dart';
 import '../../core/learning/review.dart';
 import '../../core/locale/locale_controller.dart';
+import '../../core/photo/photo_picker.dart';
 import '../../core/settings/app_settings.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/filigree.dart';
@@ -178,25 +178,21 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   Future<void> _pickPhoto() async {
     if (_sending) return;
     _dropFocus();
-    var source = ImageSource.gallery;
+    var camera = false;
     if (!kIsWeb) {
       // le navigateur propose lui-même « appareil photo » ou « fichiers »
-      final s = await showChoice<ImageSource>(context, 'Montre-moi une photo', {
-        ImageSource.camera: 'Prendre une photo',
-        ImageSource.gallery: 'Choisir dans mes photos',
+      final s = await showChoice<bool>(context, 'Montre-moi une photo', {
+        true: 'Prendre une photo',
+        false: 'Choisir dans mes photos',
       });
       if (s == null) return;
-      source = s;
+      camera = s;
     }
     Uint8List bytes;
     try {
-      // Navigateur : pas de redimensionnement ici (il échoue sur certains formats) ;
-      // le serveur réduit la photo de toute façon.
-      final file = kIsWeb
-          ? await ImagePicker().pickImage(source: source)
-          : await ImagePicker().pickImage(source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
-      if (file == null || !mounted) return;
-      bytes = await file.readAsBytes();
+      final picked = await pickPhoto(camera: camera);
+      if (picked == null || !mounted) return;
+      bytes = picked;
     } catch (e) {
       debugPrint('[photo] $e');
       if (mounted) await showInfo(context, 'Photo indisponible', 'Je n’ai pas pu ouvrir cette photo. Réessaie avec une autre.');

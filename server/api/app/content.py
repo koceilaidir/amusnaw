@@ -95,8 +95,9 @@ def word_exercise(item: Item, pool: list[Item], rng: random.Random) -> dict:
 
 AUTO_LESSONS = [
     # id, titre, sous-titre, domaine du lexique, capsule
-    ("hca-sea", "Les animaux de la mer", "D'après le lexique marin du HCA", "animaux marins", "poterie"),
-    ("hca-new-words", "Les mots d'aujourd'hui", "D'après les glossaires du HCA", "général", "officielle"),
+    # (pas de nom d'ouvrage ni d'institution dans ce qui s'affiche : les ids restent pour la progression)
+    ("hca-sea", "Les animaux de la mer", "Poissons, coquillages et autres animaux marins", "animaux marins", "poterie"),
+    ("hca-new-words", "Les mots d'aujourd'hui", "Des mots utiles pour la vie de tous les jours", "général", "officielle"),
 ]
 
 
